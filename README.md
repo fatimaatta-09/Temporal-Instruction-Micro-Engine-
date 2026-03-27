@@ -97,5 +97,5 @@ Activated dynamically when the MPO detects a predictable bottleneck (e.g., `LOAD
 The included application is a standalone graphical simulator designed to visualize the internal block-level state of the TIMM architecture. It features a retro-styled, highly educational interface allowing users to manually load instructions, step through micro-operations, and observe the datapath bus logic in real-time.
 
 ## 8. Project Team
-* **Ali Kamran** - Hardware Logic & ISA Design
-* **Fatima Rehman** - Simulator Development & Integration
+* **Ali Kamran** 
+* **Fatima Rehman** 
