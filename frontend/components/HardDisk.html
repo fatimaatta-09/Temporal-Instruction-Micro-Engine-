@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hard Disk Component</title>
+  
+  <style>
+    /* General Layout */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: transparent; /* Light theme integration */
+      color: #333333; /* Dark text */
+      display: flex;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    /* The Hard Disk Container */
+    .hard-disk-container {
+      width: 400px;
+      border: 2px solid #5a5475; /* Purple/Grey border from reference */
+      border-radius: 8px;
+      background-color: #ffffff; /* White panel */
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    .main-title {
+      font-family: 'Courier New', Courier, monospace;
+      margin-top: 0;
+      margin-bottom: 20px;
+      font-weight: bold;
+      color: #333333;
+    }
+
+    /* --- TRACE LOG TABLE STYLES --- */
+    .trace-log-wrapper {
+      width: 100%;
+      margin-bottom: 20px;
+      display: none; /* Hidden by default */
+    }
+
+    .trace-log-wrapper h3 {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
+      margin: 0 0 10px 0;
+      font-weight: bold;
+      text-align: center;
+      color: #5a5475;
+    }
+
+    .table-container {
+      height: 200px; /* Starting height */
+      min-height: 100px; /* Prevent it from being too small */
+      overflow: auto; /* Handles both scrolling and resizing */
+      border: 1px solid #b8b4c7; /* Light border */
+      background-color: #ffffff;
+      resize: vertical; /* Makes the box vertically extendable by the user */
+    }
+
+    .trace-log-table {
+      width: 100%;
+      border-collapse: collapse;
+      color: #333333; /* Dark text */
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .trace-log-table th {
+      background-color: #eef0f5; /* Light header */
+      color: #5a5475;
+      position: sticky;
+      top: 0;
+      padding: 6px 10px;
+      text-align: left;
+      font-weight: bold;
+      border: 1px solid #b8b4c7;
+    }
+
+    .trace-log-table td {
+      padding: 4px 10px;
+      border: 1px solid #e2e2ec;
+    }
+
+    /* Alternating light row colors */
+    .trace-log-table tbody tr:nth-child(even) {
+      background-color: #f8f8fc; 
+    }
+    .trace-log-table tbody tr:nth-child(odd) {
+      background-color: #ffffff;
+    }
+
+    /* Custom Scrollbar for the table (Light Theme) */
+    .table-container::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    .table-container::-webkit-scrollbar-track {
+      background: #f0f0f5; 
+      border: 1px solid #b8b4c7;
+    }
+    .table-container::-webkit-scrollbar-thumb {
+      background: #b8b4c7; 
+      border-radius: 5px;
+    }
+    .table-container::-webkit-scrollbar-thumb:hover {
+      background: #5a5475; 
+    }
+    
+    /* Resizer corner handle styling */
+    .table-container::-webkit-resizer {
+      background-color: #b8b4c7;
+    }
+
+    /* --- CONTROLS & BUTTONS --- */
+    .reveal-btn {
+      background-color: #ffffff;
+      color: #5a5475;
+      border: 2px solid #5a5475;
+      padding: 10px 40px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+
+    .reveal-btn:hover {
+      background-color: #eef0f5;
+      color: #333333;
+    }
+
+    .disk-controls {
+      display: none; /* Hidden by default */
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .button-grid {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .button-group h4 {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #5a5475;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      background-color: #ffffff;
+      color: #5a5475;
+      border: 1px solid #5a5475;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background-color: #eef0f5;
+      color: #333333;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hard-disk-container">
+    <h2 class="main-title">Hard Disk</h2>
+
+    <div class="trace-log-wrapper" id="trace-log-wrapper">
+      <h3>Trace Log</h3>
+      <div class="table-container">
+        <table class="trace-log-table">
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Data</th>
+              <th>Hex</th>
+            </tr>
+          </thead>
+          <tbody id="trace-log-body">
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+    <button class="reveal-btn" id="reveal-btn">Show</button>
+
+    <div class="disk-controls" id="disk-controls">
+      <div class="button-grid">
+        
+        <div class="button-group">
+          <h4>Program</h4>
+          <div class="actions">
+            <button class="btn" id="btn-load">Load</button>
+            <button class="btn">Save</button>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <h4>Data File</h4>
+          <div class="actions">
+            <button class="btn" id="btn-open">Open</button>
+            <button class="btn">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const revealBtn = document.getElementById('reveal-btn');
+    const diskControls = document.getElementById('disk-controls');
+    const traceLogWrapper = document.getElementById('trace-log-wrapper');
+    const traceLogBody = document.getElementById('trace-log-body');
+    const btnLoad = document.getElementById('btn-load');
+    const btnOpen = document.getElementById('btn-open');
+
+    // --- 1. TOGGLE DISK CONTROLS AND EMPTY TABLE ---
+    revealBtn.addEventListener('click', function() {
+      if (diskControls.style.display === 'none' || diskControls.style.display === '') {
+        diskControls.style.display = 'block';
+        traceLogWrapper.style.display = 'block'; // Unhide the empty table
+        revealBtn.textContent = 'Hide';
+      } else {
+        diskControls.style.display = 'none';
+        traceLogWrapper.style.display = 'none'; // Hide the table
+        revealBtn.textContent = 'Show';
+      }
+    });
+
+    // --- 2. SIMULATE LOADING DATA INTO TABLE ---
+    function loadTableData(type) {
+      // Clear any existing rows first
+      traceLogBody.innerHTML = '';
+
+      // Determine which mock data to use
+      let mockData = [];
+      if (type === 'program') {
+        mockData = [
+          { address: '[8000]', data: '10101010]', hex: '66' },
+          { address: '[8001]', data: '10101010]', hex: '81' },
+          { address: '[8011]', data: '10101010]', hex: '81' },
+          { address: '[8812]', data: '10101011]', hex: '8C' },
+          { address: '[8817]', data: '10101010]', hex: '86' },
+          { address: '[8818]', data: '11110000]', hex: 'F0' },
+          { address: '[8819]', data: '00001111]', hex: '0F' }
+        ];
+      } else if (type === 'data') {
+        mockData = [
+          { address: '[2099]', data: '00000000]', hex: '8C' },
+          { address: '[1109]', data: '00000000]', hex: '8C' },
+          { address: '[1111]', data: '00000000]', hex: '8C' },
+          { address: '[1112]', data: '00000000]', hex: '8C' }
+        ];
+      }
+
+      // Loop through the data and create table rows
+      mockData.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.address}</td>
+          <td>${row.data}</td>
+          <td>${row.hex}</td>
+        `;
+        traceLogBody.appendChild(tr);
+      });
+    }
+
+    // Attach click events to the Load and Open buttons
+    btnLoad.addEventListener('click', () => loadTableData('program'));
+    btnOpen.addEventListener('click', () => loadTableData('data'));
+
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Peripheral Interface Component</title>
+  
+  <style>
+    /* General Layout */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: transparent; /* Light theme integration */
+      color: #333333;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* Outer Container */
+    .peripheral-container {
+      width: 400px;
+      border: none; /* Borders handled by mainframe panel */
+      background-color: transparent; 
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    .main-title {
+      display: none; /* Handled by mainframe panel header */
+    }
+
+    /* --- 5-SLOT 7-SEGMENT DISPLAY STYLES --- */
+    .display-wrapper {
+      width: 100%;
+      display: block; /* Visible by default to match reference image */
+      margin-bottom: 20px;
+    }
+
+    .segmented-display-area {
+      border: 2px solid #75b8b6; /* Teal border matching reference */
+      border-radius: 6px;
+      background-color: #ffffff; /* White display screen */
+      padding: 15px;
+      display: flex;
+      justify-content: center;
+      gap: 12px; 
+      box-sizing: border-box;
+      box-shadow: inset 0 1px 4px rgba(0,0,0,0.05);
+    }
+
+    /* 7-Segment SVG Styles */
+    .seg-digit {
+      width: 45px;
+      height: 75px;
+    }
+
+    .seg {
+      fill: #eef0f5; /* UNLIT STATE: Faint grey */
+      transition: fill 0.1s ease;
+    }
+
+    /* Lit state triggered by JS */
+    .seg.on {
+      fill: #2dd4bf; /* LIT STATE: Bright cyan */
+      filter: drop-shadow(0 0 2px rgba(45, 212, 191, 0.3));
+    }
+
+    .display-separator {
+      display: none !important; /* Hide old separator line */
+    }
+
+    /* --- KEYPAD STYLES --- */
+    .keypad-wrapper {
+      width: 100%;
+      background-color: transparent; 
+      padding: 0;
+      border-radius: 8px;
+      box-sizing: border-box;
+      border: none;
+      display: block; /* Visible by default */
+    }
+
+    .keypad-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr); 
+      gap: 10px;
+    }
+
+    /* Base button styles matching reference image */
+    .btn {
+      background-color: #ffffff;
+      color: #5a5475; /* Purple/grey text */
+      border: 2px solid #d28a5e; /* Orange/brown border */
+      padding: 12px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 16px;
+      font-weight: bold;
+      transition: all 0.2s ease;
+      text-align: center;
+      box-sizing: border-box;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .btn:hover:not(.btn-blank) {
+      background-color: #fff3e0;
+      color: #d28a5e;
+    }
+
+    /* The empty placeholder button box next to '6' */
+    .btn-blank {
+      border: 2px solid #e2e2ec;
+      background-color: transparent;
+      cursor: default;
+      box-shadow: none;
+    }
+
+    /* Enter button spanning 2 rows */
+    .btn-enter {
+      grid-column: 4;
+      grid-row: span 2; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Zero button spanning 2 columns */
+    .btn-zero {
+      grid-column: span 2; 
+    }
+
+    /* --- TOGGLE BUTTONS --- */
+    .toggle-controls {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      margin-top: 20px; 
+    }
+
+    .reveal-btn {
+      flex: 1; 
+      background-color: #ffffff;
+      color: #5a5475;
+      border: 2px solid #5a5475;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .reveal-btn:hover {
+      background-color: #eef0f5;
+      color: #333333;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="peripheral-container">
+    <h2 class="main-title">Peripheral Interface</h2>
+
+    <div class="display-wrapper" id="display-wrapper">
+      <div class="segmented-display-area">
+        
+        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-1">
+          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
+          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
+          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
+          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
+          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
+          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
+          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
+        </svg>
+
+        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-2">
+          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
+          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
+          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
+          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
+          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
+          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
+          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
+        </svg>
+
+        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-3">
+          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
+          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
+          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
+          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
+          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
+          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
+          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
+        </svg>
+
+        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-4">
+          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
+          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
+          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
+          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
+          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
+          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
+          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
+        </svg>
+
+        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-5">
+          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
+          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
+          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
+          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
+          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
+          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
+          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
+        </svg>
+
+      </div>
+    </div>
+    
+    <div class="display-separator" id="display-separator"></div>
+
+    <div class="keypad-wrapper" id="keypad-wrapper">
+      <div class="keypad-grid">
+        
+        <button class="btn">7</button>
+        <button class="btn">8</button>
+        <button class="btn">9</button>
+        <button class="btn">Clear</button>
+
+        <button class="btn">4</button>
+        <button class="btn">5</button>
+        <button class="btn">6</button>
+        <div class="btn btn-blank"></div>
+
+        <button class="btn">1</button>
+        <button class="btn">2</button>
+        <button class="btn">3</button>
+        <button class="btn btn-enter">Enter</button>
+
+        <button class="btn btn-zero">0</button>
+        <button class="btn">.</button>
+
+      </div>
+    </div>
+
+    <div class="toggle-controls">
+      <button class="reveal-btn" id="toggle-display-btn">Hide Display</button>
+      <button class="reveal-btn" id="toggle-keypad-btn">Hide Keypad</button>
+    </div>
+
+  </div>
+
+  <script>
+    // Elements
+    const toggleDisplayBtn = document.getElementById('toggle-display-btn');
+    const toggleKeypadBtn = document.getElementById('toggle-keypad-btn');
+    
+    const displayWrapper = document.getElementById('display-wrapper');
+    const displaySeparator = document.getElementById('display-separator');
+    const keypadWrapper = document.getElementById('keypad-wrapper');
+
+    // Helper to check if both are visible to show/hide the separator line
+    function updateSeparator() {
+      if (displayWrapper.style.display === 'block' && keypadWrapper.style.display === 'block') {
+        displaySeparator.style.display = 'block';
+      } else {
+        displaySeparator.style.display = 'none';
+      }
+    }
+
+    // Toggle Display Logic
+    toggleDisplayBtn.addEventListener('click', function() {
+      if (displayWrapper.style.display === 'none' || displayWrapper.style.display === '') {
+        displayWrapper.style.display = 'block';
+        toggleDisplayBtn.textContent = 'Hide Display';
+      } else {
+        displayWrapper.style.display = 'none';
+        toggleDisplayBtn.textContent = 'Show Display';
+      }
+      updateSeparator();
+    });
+
+    // Toggle Keypad Logic
+    toggleKeypadBtn.addEventListener('click', function() {
+      if (keypadWrapper.style.display === 'none' || keypadWrapper.style.display === '') {
+        keypadWrapper.style.display = 'block';
+        toggleKeypadBtn.textContent = 'Hide Keypad';
+      } else {
+        keypadWrapper.style.display = 'none';
+        toggleKeypadBtn.textContent = 'Show Keypad';
+      }
+      updateSeparator();
+    });
+  </script>
+
+</body>
+</html>
