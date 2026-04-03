@@ -1,4 +1,4 @@
-# TIMM: Temporal Insight Maurice Machine
+# TIME: Temporal Insight Micro Engine
 
 > **An Adaptive, Self-Optimizing Microprogrammed Processor Architecture**
 
