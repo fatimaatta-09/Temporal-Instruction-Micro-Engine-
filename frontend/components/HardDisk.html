@@ -9,19 +9,21 @@
     /* General Layout */
     body {
       font-family: Arial, sans-serif;
-      background-color: transparent; /* Light theme integration */
-      color: #333333; /* Dark text */
+      background-color: transparent; 
+      color: #333333; 
       display: flex;
       justify-content: center;
-      padding: 40px;
+      padding: 10px; 
+      margin: 0;
+      box-sizing: border-box;
     }
 
     /* The Hard Disk Container */
     .hard-disk-container {
-      width: 400px;
-      border: 2px solid #5a5475; /* Purple/Grey border from reference */
+      width: 100%; 
+      border: 2px solid #5a5475; 
       border-radius: 8px;
-      background-color: #ffffff; /* White panel */
+      background-color: #ffffff; 
       padding: 20px;
       display: flex;
       flex-direction: column;
@@ -32,7 +34,7 @@
     .main-title {
       font-family: 'Courier New', Courier, monospace;
       margin-top: 0;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       font-weight: bold;
       color: #333333;
     }
@@ -40,8 +42,8 @@
     /* --- TRACE LOG TABLE STYLES --- */
     .trace-log-wrapper {
       width: 100%;
-      margin-bottom: 20px;
-      display: none; /* Hidden by default */
+      margin-bottom: 15px;
+      display: block; /* Always visible */
     }
 
     .trace-log-wrapper h3 {
@@ -54,24 +56,23 @@
     }
 
     .table-container {
-      height: 200px; /* Starting height */
-      min-height: 100px; /* Prevent it from being too small */
-      overflow: auto; /* Handles both scrolling and resizing */
-      border: 1px solid #b8b4c7; /* Light border */
+      height: 180px; 
+      width: 100%; 
+      overflow: auto; 
+      border: 1px solid #b8b4c7; 
       background-color: #ffffff;
-      resize: vertical; /* Makes the box vertically extendable by the user */
     }
 
     .trace-log-table {
       width: 100%;
       border-collapse: collapse;
-      color: #333333; /* Dark text */
+      color: #333333; 
       font-family: monospace;
       font-size: 13px;
     }
 
     .trace-log-table th {
-      background-color: #eef0f5; /* Light header */
+      background-color: #eef0f5; 
       color: #5a5475;
       position: sticky;
       top: 0;
@@ -86,7 +87,6 @@
       border: 1px solid #e2e2ec;
     }
 
-    /* Alternating light row colors */
     .trace-log-table tbody tr:nth-child(even) {
       background-color: #f8f8fc; 
     }
@@ -94,7 +94,6 @@
       background-color: #ffffff;
     }
 
-    /* Custom Scrollbar for the table (Light Theme) */
     .table-container::-webkit-scrollbar {
       width: 10px;
       height: 10px;
@@ -110,34 +109,10 @@
     .table-container::-webkit-scrollbar-thumb:hover {
       background: #5a5475; 
     }
-    
-    /* Resizer corner handle styling */
-    .table-container::-webkit-resizer {
-      background-color: #b8b4c7;
-    }
 
     /* --- CONTROLS & BUTTONS --- */
-    .reveal-btn {
-      background-color: #ffffff;
-      color: #5a5475;
-      border: 2px solid #5a5475;
-      padding: 10px 40px;
-      font-size: 16px;
-      font-weight: bold;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-bottom: 10px;
-      transition: all 0.2s ease;
-      width: 100%;
-    }
-
-    .reveal-btn:hover {
-      background-color: #eef0f5;
-      color: #333333;
-    }
-
     .disk-controls {
-      display: none; /* Hidden by default */
+      display: block; /* Always visible */
       width: 100%;
       margin-top: 10px;
     }
@@ -203,12 +178,10 @@
             </tr>
           </thead>
           <tbody id="trace-log-body">
-            </tbody>
+          </tbody>
         </table>
       </div>
     </div>
-
-    <button class="reveal-btn" id="reveal-btn">Show</button>
 
     <div class="disk-controls" id="disk-controls">
       <div class="button-grid">
@@ -235,68 +208,17 @@
   </div>
 
   <script>
-    const revealBtn = document.getElementById('reveal-btn');
-    const diskControls = document.getElementById('disk-controls');
-    const traceLogWrapper = document.getElementById('trace-log-wrapper');
     const traceLogBody = document.getElementById('trace-log-body');
     const btnLoad = document.getElementById('btn-load');
     const btnOpen = document.getElementById('btn-open');
 
-    // --- 1. TOGGLE DISK CONTROLS AND EMPTY TABLE ---
-    revealBtn.addEventListener('click', function() {
-      if (diskControls.style.display === 'none' || diskControls.style.display === '') {
-        diskControls.style.display = 'block';
-        traceLogWrapper.style.display = 'block'; // Unhide the empty table
-        revealBtn.textContent = 'Hide';
-      } else {
-        diskControls.style.display = 'none';
-        traceLogWrapper.style.display = 'none'; // Hide the table
-        revealBtn.textContent = 'Show';
-      }
-    });
-
-    // --- 2. SIMULATE LOADING DATA INTO TABLE ---
+    // --- 1. CLEAN DATA LOADER (NO PLACEHOLDERS) ---
     function loadTableData(type) {
-      // Clear any existing rows first
       traceLogBody.innerHTML = '';
-
-      // Determine which mock data to use
-      let mockData = [];
-      if (type === 'program') {
-        mockData = [
-          { address: '[8000]', data: '10101010]', hex: '66' },
-          { address: '[8001]', data: '10101010]', hex: '81' },
-          { address: '[8011]', data: '10101010]', hex: '81' },
-          { address: '[8812]', data: '10101011]', hex: '8C' },
-          { address: '[8817]', data: '10101010]', hex: '86' },
-          { address: '[8818]', data: '11110000]', hex: 'F0' },
-          { address: '[8819]', data: '00001111]', hex: '0F' }
-        ];
-      } else if (type === 'data') {
-        mockData = [
-          { address: '[2099]', data: '00000000]', hex: '8C' },
-          { address: '[1109]', data: '00000000]', hex: '8C' },
-          { address: '[1111]', data: '00000000]', hex: '8C' },
-          { address: '[1112]', data: '00000000]', hex: '8C' }
-        ];
-      }
-
-      // Loop through the data and create table rows
-      mockData.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${row.address}</td>
-          <td>${row.data}</td>
-          <td>${row.hex}</td>
-        `;
-        traceLogBody.appendChild(tr);
-      });
     }
 
-    // Attach click events to the Load and Open buttons
     btnLoad.addEventListener('click', () => loadTableData('program'));
     btnOpen.addEventListener('click', () => loadTableData('data'));
-
   </script>
 
 </body>
