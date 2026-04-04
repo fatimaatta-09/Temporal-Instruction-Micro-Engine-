@@ -35,14 +35,15 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.02);
     }
 
+    /* BUMPED: Main Title */
     .main-title {
       font-family: 'Courier New', Courier, monospace;
       margin: 0;
-      font-size: 20px;
+      font-size: 22px; /* Matched Blueprint */
       font-weight: bold;
       color: #333333;
       text-align: center;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
       text-transform: uppercase;
       flex-shrink: 0; 
     }
@@ -104,13 +105,15 @@
       height: 100%; 
     }
 
+    /* BUMPED: Standardized Button Style */
     .btn {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
       color: #5a5475; 
       border: 2px solid #d28a5e; 
       cursor: pointer;
       border-radius: 6px;
-      font-size: 22px; 
+      font-size: 20px; /* Perfect size for digit buttons */
       font-weight: bold;
       transition: all 0.2s ease;
       display: flex;
@@ -119,11 +122,18 @@
       width: 100%;
       height: 100%; 
       padding: 0; 
+      text-transform: uppercase;
     }
 
     .btn:hover:not(.btn-blank) {
       background-color: #fff3e0;
       color: #d28a5e;
+    }
+
+    /* BUMPED: Action Text Buttons (Clear, Enter) */
+    .btn-text {
+      font-size: 16px; /* Matched Blueprint */
+      letter-spacing: 1px;
     }
 
     .btn-blank {
@@ -210,7 +220,7 @@
         <button class="btn">7</button>
         <button class="btn">8</button>
         <button class="btn">9</button>
-        <button class="btn" style="font-size: 18px;">Clear</button>
+        <button class="btn btn-text">CLEAR</button>
 
         <button class="btn">4</button>
         <button class="btn">5</button>
@@ -220,7 +230,7 @@
         <button class="btn">1</button>
         <button class="btn">2</button>
         <button class="btn">3</button>
-        <button class="btn btn-enter" style="font-size: 18px;">Enter</button>
+        <button class="btn btn-enter btn-text">ENTER</button>
 
         <button class="btn btn-zero">0</button>
         <button class="btn">.</button>
@@ -241,40 +251,41 @@
 
     // Helper to check if both are visible to show/hide the separator line
     function updateSeparator() {
-      if (displayWrapper.style.display === 'block' && keypadWrapper.style.display === 'block') {
-        displaySeparator.style.display = 'block';
-      } else {
-        displaySeparator.style.display = 'none';
+      if (displayWrapper && keypadWrapper && displaySeparator) {
+        if (displayWrapper.style.display === 'block' && keypadWrapper.style.display === 'block') {
+          displaySeparator.style.display = 'block';
+        } else {
+          displaySeparator.style.display = 'none';
+        }
       }
     }
 
-    // Toggle Display Logic
-    toggleDisplayBtn.addEventListener('click', function() {
-      if (displayWrapper.style.display === 'none' || displayWrapper.style.display === '') {
-        displayWrapper.style.display = 'block';
-        toggleDisplayBtn.textContent = 'Hide Display';
-      } else {
-        displayWrapper.style.display = 'none';
-        toggleDisplayBtn.textContent = 'Show Display';
-      }
-      updateSeparator();
-    });
+    if (toggleDisplayBtn) {
+      toggleDisplayBtn.addEventListener('click', function() {
+        if (displayWrapper.style.display === 'none' || displayWrapper.style.display === '') {
+          displayWrapper.style.display = 'block';
+          toggleDisplayBtn.textContent = 'Hide Display';
+        } else {
+          displayWrapper.style.display = 'none';
+          toggleDisplayBtn.textContent = 'Show Display';
+        }
+        updateSeparator();
+      });
+    }
 
-    // Toggle Keypad Logic
-    toggleKeypadBtn.addEventListener('click', function() {
-      if (keypadWrapper.style.display === 'none' || keypadWrapper.style.display === '') {
-        keypadWrapper.style.display = 'block';
-        toggleKeypadBtn.textContent = 'Hide Keypad';
-      } else {
-        keypadWrapper.style.display = 'none';
-        toggleKeypadBtn.textContent = 'Show Keypad';
-      }
-      updateSeparator();
-    });
+    if (toggleKeypadBtn) {
+      toggleKeypadBtn.addEventListener('click', function() {
+        if (keypadWrapper.style.display === 'none' || keypadWrapper.style.display === '') {
+          keypadWrapper.style.display = 'block';
+          toggleKeypadBtn.textContent = 'Hide Keypad';
+        } else {
+          keypadWrapper.style.display = 'none';
+          toggleKeypadBtn.textContent = 'Show Keypad';
+        }
+        updateSeparator();
+      });
+    }
   </script>
 
 </body>
 </html>
-
-
-

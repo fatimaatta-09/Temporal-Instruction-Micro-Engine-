@@ -85,8 +85,14 @@
             background-color: #ffffff;
             display: block; 
             position: relative;
-            overflow: hidden;
+            overflow: hidden; 
         }
+
+        /* BROKEN CLIP LOCK SO OUR HUMP HACK CAN STICK OUT */
+        .panel-center { 
+            width: calc(1800px - 420px - 450px - 60px); 
+            overflow: visible !important; 
+        } 
 
         .panel-header {
             text-align: center;
@@ -103,10 +109,10 @@
             position: absolute;
             top: 0; left: 0; right: 0;
             z-index: 10;
+            border-radius: 4px 4px 0 0;
         }
 
         .panel-left { width: 420px; flex-shrink: 0; }
-        .panel-center { width: calc(1800px - 420px - 450px - 60px); } 
         .panel-right { width: 450px; flex-shrink: 0; }
 
         /* --- IFRAME CONTAINERS --- */
@@ -131,8 +137,13 @@
             padding: 10px 0;
         }
 
+        /* CENTER PANEL CONFIGURATION */
         .panel-center .iframe-container { 
-            padding: 0; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 10px 0 10px !important; 
+            overflow: visible !important; 
         }
 
         iframe { border: none; background: transparent; }
@@ -151,20 +162,132 @@
         .wrap-ram { flex-grow: 1; position: relative; margin-bottom: 0; } 
         .wrap-ram iframe { width: 530px; height: calc(100% / 0.72); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.72); transform-origin: top center; }
 
-        /* --- CENTER PANEL --- */
-        .cpu-wrap { width: 100%; height: calc(100% - 220px); position: relative; overflow: hidden; }
-        .cpu-iframe { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        /* --- CENTER PANEL MODULES --- */
+        .cpu-wrap { 
+            width: 850px; 
+            height: calc(850px * (760 / 1200)); 
+            position: relative; 
+            overflow: hidden; 
+            flex-shrink: 0; 
+            margin-bottom: 10px; 
+            z-index: 2;
+        }
         
-        .wrap-clock { width: 100%; height: 220px; position: relative; overflow: hidden; margin: 0; padding: 0; }
-        .wrap-clock iframe { width: 1200px; height: 280px; position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.72); transform-origin: top center; }
+        .cpu-iframe { 
+            width: 1200px; 
+            height: 760px; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            transform: scale(calc(850 / 1200));
+            transform-origin: top left;
+        }
+        
+        .wrap-clock { 
+            width: 850px; 
+            height: calc(850px * (240 / 1200)); 
+            position: relative; 
+            overflow: hidden; 
+            margin: 0 0 10px 0; 
+            padding: 0; 
+            flex-shrink: 0;
+            z-index: 1;
+        }
+        
+        .wrap-clock iframe { 
+            width: 1200px; 
+            height: 240px; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            transform: scale(calc(850 / 1200)); 
+            transform-origin: top left; 
+        }
+
+        /* --- THE HUMP: GROUP INFO CONSOLE --- */
+        .info-console-wrap {
+            width: 850px; 
+            flex-grow: 1; 
+            padding: 0; 
+            margin: 0;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            position: relative; 
+        }
+
+        /* REFINED WHITE BOX HACK (No more broken squiggly corners) */
+        .border-cover-hack {
+            position: absolute;
+            bottom: -2px; 
+            left: 2px; /* Stay inside the vertical border lines */
+            width: calc(100% - 4px); 
+            height: 4px; 
+            background-color: #ffffff;
+            z-index: 100;
+        }
+
+        .info-console {
+            flex-grow: 1;
+            border: 2px solid #5a5475;
+            background-color: #ffffff;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13.5px; /* Shrunk font slightly to fit text */
+            color: #5a5475;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            
+            border-bottom: none !important; 
+            border-radius: 8px 8px 0 0 !important; 
+            margin-bottom: 0 !important;
+        }
+
+        .info-header {
+            font-weight: bold;
+            text-transform: uppercase;
+            border-bottom: 1px dashed #b8b4c7;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            letter-spacing: 1px;
+            color: #3b7c97;
+            font-size: 16px;
+        }
+
+        /* --- HORIZONTAL TEAM ROW STYLING --- */
+        .info-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            justify-content: center;
+            align-items: center;
+            flex-grow: 1; 
+            width: 100%;
+        }
+
+        .team-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px; /* Shrunk gap so names don't explode out the sides */
+            width: 100%;
+            white-space: nowrap; 
+        }
+
+        .team-label {
+            font-weight: bold;
+            color: #333333;
+        }
+
+        .team-member {
+            color: #5a5475;
+        }
 
         /* --- RIGHT PANEL --- */
-        .wrap-screen { 
-            flex-grow: 1; 
-            position: relative; 
-            margin-bottom: 15px; 
-            min-height: 400px; 
-        } 
+        .wrap-screen { flex-grow: 1; position: relative; margin-bottom: 15px; min-height: 400px; } 
         .wrap-screen iframe { width: 420px; height: 100%; position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
         
         .wrap-printer { height: 120px; position: relative; flex-shrink: 0; margin-bottom: 15px; } 
@@ -173,35 +296,33 @@
         .wrap-lan { height: 210px; position: relative; flex-shrink: 0; margin-bottom: 5px; } 
         .wrap-lan iframe { width: 1100px; height: calc(100% / 0.4); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.4); transform-origin: top center; }
 
-
-        /* --- UPDATED: BOTTOM-RIGHT CORNER POPUP (NO FROST) --- */
+        /* --- LOGS MODAL --- */
         .logs-modal-overlay {
             position: absolute; 
             top: 0; left: 0; right: 0; bottom: 0;
-            background: transparent; /* Frosted look completely removed */
+            background: transparent; 
             backdrop-filter: none;
             display: none; 
-            pointer-events: none; /* Allows you to click the simulator behind the popup! */
+            pointer-events: none; 
             z-index: 1000;
         }
 
         .logs-modal-content {
             position: absolute;
-            bottom: 30px; /* Snaps it to the bottom */
-            right: 30px; /* Snaps it to the right */
-            width: 550px; /* Slightly scaled down so it doesn't block too much */
+            bottom: 30px; 
+            right: 30px; 
+            width: 550px; 
             height: 380px;
             background: transparent;
             border: none;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.15); /* Clean hardware shadow */
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15); 
             display: flex;
             flex-direction: column;
             border-radius: 8px;
-            pointer-events: auto; /* Re-enables clicking inside the popup itself */
+            pointer-events: auto; 
             animation: slideInCorner 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
         }
 
-        /* Cool slide-in-from-corner animation */
         @keyframes slideInCorner {
             from { transform: translate(50px, 50px) scale(0.9); opacity: 0; }
             to { transform: translate(0, 0) scale(1); opacity: 1; }
@@ -246,8 +367,27 @@
             <div class="panel panel-center">
                 <div class="panel-header">OPERATIONAL CORE SCHEMATIC</div>
                 <div class="iframe-container">
+                    
                     <div class="cpu-wrap"><iframe src="components/cpu.html" class="cpu-iframe" scrolling="no"></iframe></div>
                     <div class="wrap-clock"><iframe src="components/clock.html" scrolling="no"></iframe></div>
+                    
+                    <div class="info-console-wrap">
+                        <div class="info-console" id="system-info-console">
+                            <div class="info-header">Project Group Information</div>
+                            
+                            <div class="info-body">
+                                <div class="team-row">
+                                    <span class="team-label">TEAM MEMBERS:</span>
+                                    <span class="team-member">• Student Name 1 (ID: XXXXXX)</span>
+                                    <span class="team-member">• Student Name 2 (ID: XXXXXX)</span>
+                                    <span class="team-member">• Student Name 3 (ID: XXXXXX)</span>
+                                </div>
+                            </div>
+                            
+                        </div>
+                        <div class="border-cover-hack"></div>
+                    </div>
+
                 </div>
             </div>
             
@@ -262,8 +402,8 @@
 
         </div>
 
-        <div class="logs-modal-overlay" id="logs-modal">
-            <div class="logs-modal-content">
+        <div class="logs-modal-overlay" id="logs-modal" onclick="closeNetworkLogsPopup()">
+            <div class="logs-modal-content" onclick="event.stopPropagation()">
                 <div class="wrap-logs-popup">
                     <iframe src="components/logs.html" scrolling="no"></iframe>
                 </div>
@@ -281,7 +421,6 @@
         window.addEventListener('resize', scaleDashboard);
         scaleDashboard();
 
-        // Modal toggle logic (updated for display: block since we removed flex centering)
         function toggleNetworkLogsPopup() {
             const modal = document.getElementById('logs-modal');
             if (modal.style.display === 'block') {
@@ -291,7 +430,6 @@
             }
         }
 
-        // Dedicated close function called securely from logs.html
         function closeNetworkLogsPopup() {
             document.getElementById('logs-modal').style.display = 'none';
         }

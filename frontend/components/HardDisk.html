@@ -6,9 +6,9 @@
   <title>Hard Disk Component</title>
   
   <style>
-    /* General Layout */
+    /* --- GENERAL LAYOUT --- */
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: transparent; 
       color: #333333; 
       display: flex;
@@ -18,7 +18,7 @@
       box-sizing: border-box;
     }
 
-    /* The Hard Disk Container */
+    /* --- HARD DISK CONTAINER --- */
     .hard-disk-container {
       width: 100%; 
       border: 2px solid #5a5475; 
@@ -31,26 +31,34 @@
       box-sizing: border-box;
     }
 
+    /* Main Title - Matches Blueprint */
     .main-title {
       font-family: 'Courier New', Courier, monospace;
       margin-top: 0;
       margin-bottom: 15px;
+      font-size: 22px; 
       font-weight: bold;
-      color: #333333;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #5a5475;
+      text-align: center;
     }
 
     /* --- TRACE LOG TABLE STYLES --- */
     .trace-log-wrapper {
       width: 100%;
       margin-bottom: 15px;
-      display: block; /* Always visible */
+      display: block;
     }
 
-    .trace-log-wrapper h3 {
+    /* Sub-headers */
+    .trace-log-wrapper h3, .button-group h4 {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 16px;
+      font-size: 16px; /* Scaled down for narrow column */
       margin: 0 0 10px 0;
       font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
       text-align: center;
       color: #5a5475;
     }
@@ -59,19 +67,20 @@
       height: 180px; 
       width: 100%; 
       overflow: auto; 
-      border: 1px solid #b8b4c7; 
+      border: 2px solid #b8b4c7; 
+      border-radius: 4px;
       background-color: #ffffff;
     }
 
     .trace-log-table {
       width: 100%;
       border-collapse: collapse;
-      color: #333333; 
       font-family: monospace;
-      font-size: 13px;
     }
 
+    /* Table Headers */
     .trace-log-table th {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #eef0f5; 
       color: #5a5475;
       position: sticky;
@@ -79,12 +88,24 @@
       padding: 6px 10px;
       text-align: left;
       font-weight: bold;
-      border: 1px solid #b8b4c7;
+      font-size: 13px; /* Kept compact for the log */
+      text-transform: uppercase;
+      border-bottom: 2px solid #b8b4c7; 
+      border-right: 1px solid #e2e2ec;
+      letter-spacing: 1px;
     }
 
+    .trace-log-table th:last-child {
+        border-right: none;
+    }
+
+    /* Table Data Readouts */
     .trace-log-table td {
-      padding: 4px 10px;
+      padding: 6px 10px;
       border: 1px solid #e2e2ec;
+      font-size: 14px; /* Scaled down for readability */
+      font-weight: bold;
+      color: #3b7c97; /* Standardized Data Teal */
     }
 
     .trace-log-table tbody tr:nth-child(even) {
@@ -100,7 +121,7 @@
     }
     .table-container::-webkit-scrollbar-track {
       background: #f0f0f5; 
-      border: 1px solid #b8b4c7;
+      border-left: 1px solid #b8b4c7;
     }
     .table-container::-webkit-scrollbar-thumb {
       background: #b8b4c7; 
@@ -112,7 +133,7 @@
 
     /* --- CONTROLS & BUTTONS --- */
     .disk-controls {
-      display: block; /* Always visible */
+      display: block; 
       width: 100%;
       margin-top: 10px;
     }
@@ -129,29 +150,24 @@
       align-items: center;
     }
 
-    .button-group h4 {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 16px;
-      margin-top: 0;
-      margin-bottom: 8px;
-      font-weight: bold;
-      color: #5a5475;
-    }
-
     .actions {
       display: flex;
       gap: 10px;
     }
 
+    /* Sleeker Buttons */
     .btn {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
       color: #5a5475;
-      border: 1px solid #5a5475;
-      padding: 8px 16px;
+      border: 2px solid #5a5475; 
+      padding: 8px 16px; /* Reduced chunkiness */
       cursor: pointer;
       border-radius: 4px;
-      font-size: 14px;
+      font-size: 14px; /* Reduced from 16px to fit nicely */
       font-weight: bold;
+      text-transform: uppercase; 
+      letter-spacing: 1px;
       transition: all 0.2s ease;
     }
 
@@ -178,7 +194,7 @@
             </tr>
           </thead>
           <tbody id="trace-log-body">
-          </tbody>
+            </tbody>
         </table>
       </div>
     </div>
@@ -212,8 +228,9 @@
     const btnLoad = document.getElementById('btn-load');
     const btnOpen = document.getElementById('btn-open');
 
-    // --- 1. CLEAN DATA LOADER (NO PLACEHOLDERS) ---
+    // --- CLEAN DATA LOADER (NO PLACEHOLDERS) ---
     function loadTableData(type) {
+      // Wiped the dummy data insertion
       traceLogBody.innerHTML = '';
     }
 

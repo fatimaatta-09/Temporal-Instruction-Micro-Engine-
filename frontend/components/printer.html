@@ -8,7 +8,7 @@
   <style>
     /* --- GENERAL LAYOUT --- */
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Blueprint Standard */
       background-color: transparent; 
       color: #333333; 
       display: flex;
@@ -16,11 +16,11 @@
       padding: 10px;
       margin: 0;
       box-sizing: border-box;
-      overflow: hidden; /* Banishes scrollbars */
-      height: 100vh; /* Locks to iframe height */
+      overflow: hidden; 
+      height: 100vh; 
     }
 
-    /* --- OUTER CONTAINER (SHORTER HEIGHT) --- */
+    /* --- OUTER CONTAINER --- */
     .printer-container {
       width: 100%; 
       height: 100%; 
@@ -53,7 +53,7 @@
       flex-shrink: 0;
     }
 
-    /* Title Banner */
+    /* BUMPED: Title Banner */
     .title-banner {
       width: 100%;
       border: 2px solid #5a5475;
@@ -62,7 +62,7 @@
       padding: 8px;
       text-align: center;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 18px;
+      font-size: 22px; /* Matched Blueprint */
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 2px;
@@ -94,18 +94,21 @@
       height: 100%;
     }
 
-    /* Base button styles */
+    /* BUMPED: Standard Button Styles */
     .btn {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
       color: #5a5475;
       border: 2px solid #5a5475;
       cursor: pointer;
       border-radius: 6px;
-      font-size: 15px;
+      font-size: 16px; /* Blueprint Base */
       transition: all 0.2s ease;
       text-align: center;
       box-sizing: border-box;
       font-weight: bold;
+      text-transform: uppercase; /* Standardized */
+      letter-spacing: 1px;
     }
 
     .btn:hover:not(:disabled) {
@@ -123,11 +126,11 @@
     /* The large "Tear paper" area fills the whole right side */
     .btn-tear-paper {
       width: 100%;
-      height: 100%; /* Stretches to fill the column perfectly */
+      height: 100%; 
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 20px; /* Slightly larger text */
+      font-size: 18px; /* Slightly larger text to fill the giant button space, but still obeys blueprint styling */
       padding: 0;
     }
   </style>
@@ -138,7 +141,7 @@
     <div class="printer-wrapper">
       
       <div class="printer-col-left">
-        <div class="title-banner">Printer</div>
+        <div class="title-banner">PRINTER</div>
         
         <svg id="printer-graphic" class="printer-graphic" viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -173,7 +176,7 @@
       </div>
 
       <div class="printer-col-right">
-        <button id="tear-paper-btn" class="btn btn-tear-paper">Tear paper</button>
+        <button id="tear-paper-btn" class="btn btn-tear-paper">TEAR PAPER</button>
       </div>
 
     </div>
@@ -189,8 +192,8 @@
       void printedSheet.offsetWidth; 
       printedSheet.classList.add('printing');
 
-      const originalText = "Tear paper";
-      tearPaperBtn.textContent = "Printing...";
+      const originalText = "TEAR PAPER";
+      tearPaperBtn.textContent = "PRINTING..."; // Capitalized JS update
       tearPaperBtn.disabled = true; 
 
       setTimeout(() => {

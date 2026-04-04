@@ -18,7 +18,7 @@
       box-sizing: border-box;
       height: 100vh;
       width: 100vw;
-      overflow: hidden; /* Kills all scrollbars on the window */
+      overflow: hidden; 
     }
 
     /* --- BORDERED OUTER CONTAINER --- */
@@ -36,15 +36,17 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.02);
     }
 
+    /* BUMPED: Main Title */
     .main-title {
       font-family: 'Courier New', Courier, monospace;
       margin-top: 0;
       margin-bottom: 15px;
-      font-size: 20px;
+      font-size: 22px; 
       font-weight: bold;
-      color: #333333;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #5a5475;
       text-align: center;
-      letter-spacing: 1px;
       flex-shrink: 0;
     }
 
@@ -77,26 +79,40 @@
       flex-shrink: 0;
     }
 
+    /* BUMPED: Mnemonics Label to 16px to match button */
     .ram-controls label {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 14px;
+      font-size: 16px; /* BUMPED FROM 14px */
       color: #5a5475;
       font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 10px; /* Slightly wider gap for the bigger checkbox */
       cursor: pointer;
     }
 
+    /* Scaled up the physical checkbox square so it doesn't look tiny next to 16px text */
+    .ram-controls input[type="checkbox"] {
+      transform: scale(1.2);
+      cursor: pointer;
+      margin: 0;
+      accent-color: #5a5475;
+    }
+
+    /* BUMPED: Standardized Button Style (Red Theme) */
     .clear-btn {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
       color: #c95c5a; 
-      border: 1px solid #c95c5a;
-      padding: 6px 16px;
+      border: 2px solid #c95c5a; 
+      padding: 6px 14px;
       border-radius: 4px;
       font-weight: bold;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
+      letter-spacing: 1px;
       transition: all 0.2s ease;
       text-transform: uppercase;
     }
@@ -106,7 +122,7 @@
     /* --- ENLARGED MEMORY GRID --- */
     .ram-grid {
       display: flex;
-      gap: 15px; /* REDUCED GAP to prevent overflow */
+      gap: 15px; 
       width: 100%;
       flex-grow: 1; 
       overflow: hidden; 
@@ -117,7 +133,7 @@
       flex-direction: column;
       flex: 1; 
       justify-content: space-between; 
-      min-width: 0; /* Ensures column obeys flex bounds */
+      min-width: 0; 
     }
 
     .ram-cell {
@@ -127,27 +143,29 @@
       height: 32px; 
     }
 
+    /* BUMPED: Memory Address Labels */
     .ram-cell label {
       font-family: 'Courier New', Courier, monospace;
       font-size: 15px; 
       font-weight: bold;
       color: #5a5475;
-      width: 20px; /* Slightly tighter width */
+      width: 20px; 
       text-align: right;
       flex-shrink: 0;
     }
 
+    /* BUMPED: Data Inputs */
     .ram-input {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 15px; /* Scaled down just a hair for perfect fit */
-      color: #3b7c97; 
+      font-size: 15px; 
+      color: #3b7c97; /* Standardized Data Teal */
       border: 1px solid #b8b4c7;
       border-radius: 4px;
       padding: 4px 6px;
       height: 28px; 
       flex-grow: 1; 
-      min-width: 0; /* CRITICAL: Forces the input to shrink inside its container */
-      margin-left: 8px; /* Tighter margin */
+      min-width: 0; 
+      margin-left: 8px; 
       text-align: center;
       background-color: #f8f8fc;
       font-weight: bold;

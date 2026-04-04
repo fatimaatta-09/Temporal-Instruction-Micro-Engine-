@@ -6,28 +6,34 @@
   <title>System Clock Component</title>
   
   <style>
-    /* --- GENERAL PAGE LAYOUT --- */
+    /* --- GENERAL PAGE LAYOUT (STRIPPED PADDING FOR PERFECT ALIGNMENT) --- */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: transparent; /* Allows mainframe background through */
+      background-color: transparent; 
       color: #333333;
       display: flex;
       justify-content: center;
-      padding: 40px;
+      align-items: center; /* Centers perfectly in iframe */
+      padding: 0; /* REMOVED HIDDEN PADDING */
       margin: 0;
+      width: 100vw;
+      height: 100vh;
+      box-sizing: border-box;
+      overflow: hidden; /* Banishes scrollbars */
     }
 
     /* --- HORIZONTAL MODULE STYLING --- */
     .clock-module {
-      width: 1200px; 
-      height: 240px; 
-      border: 2px solid #5a5475; /* Purple/Grey border */
+      width: 1200px; /* EXACTLY matches the CPU width now! */
+      height: 100%; /* Stretches to fill the 280px iframe perfectly */
+      border: 2px solid #5a5475; 
       border-radius: 8px;
-      background: #ffffff; /* Light panel background */
+      background: #ffffff; 
       padding: 20px 40px;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       box-sizing: border-box;
       position: relative;
       box-shadow: 0 4px 10px rgba(0,0,0,0.02);
@@ -36,7 +42,6 @@
     /* Wrapper for visibility toggling */
     .clock-contents {
       width: 100%;
-      height: 100%;
       display: flex;
       flex-direction: row;
       justify-content: space-between;
@@ -103,7 +108,7 @@
       font-weight: bold;
     }
 
-    /* Custom Hardware Slider Styling - Light Theme */
+    /* Custom Hardware Slider Styling */
     input[type=range] {
       -webkit-appearance: none;
       width: 100%;
@@ -125,7 +130,7 @@
       height: 34px;
       width: 18px;
       border-radius: 4px;
-      background: #72a973; /* Green handle matching reference image */
+      background: #72a973; 
       cursor: pointer;
       -webkit-appearance: none;
       margin-top: -12px;
@@ -144,14 +149,12 @@
       align-items: center;
     }
 
-    /* Interactive Container for typing */
     .readout-interactive-container {
       position: relative;
       width: 200px;
       height: 80px;
     }
 
-    /* The transparent input field overlaid on the SVG */
     .hidden-number-input {
       position: absolute;
       top: 0;
@@ -172,12 +175,11 @@
       -moz-appearance: textfield;
     }
 
-    /* The SVG 7-Segment Box */
     .readout-box {
       width: 100%;
       height: 100%;
       border: 2px solid #5a5475; 
-      background-color: #ffffff; /* White background */
+      background-color: #ffffff; 
       display: flex;
       justify-content: center;
       align-items: center;
@@ -189,30 +191,25 @@
       transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    /* Glow effect when the user clicks to type */
     .hidden-number-input:focus + .readout-box {
       border-color: #72a973;
       box-shadow: inset 0 1px 4px rgba(0,0,0,0.05), 0 0 8px rgba(114, 169, 115, 0.4);
     }
 
-    /* Individual 7-Segment Digit SVG */
     .seg-digit {
       height: 100%;
       width: auto;
     }
 
-    /* Base unlit segment style */
     .seg {
-      fill: #eef0f5; /* Light grey */
+      fill: #eef0f5; 
       transition: fill 0.05s ease;
     }
 
-    /* Lit segment style - Cyan */
     .seg.on {
-      fill: #2dd4bf; /* Bright Cyan matching screen reference */
+      fill: #2dd4bf; 
     }
 
-    /* HZ Label */
     .hz-label {
       font-family: 'Courier New', Courier, monospace;
       color: #5a5475;
@@ -379,11 +376,9 @@
       }
     });
 
-    // --- Robust 7-Segment Render Logic (FIXED BUG) ---
+    // --- Robust 7-Segment Render Logic ---
     function setDigit(svgElement, char) {
-      // Clear all active segments
       svgElement.querySelectorAll('.seg:not(.dp)').forEach(el => el.classList.remove('on'));
-      
       const segmentsToTurnOn = segMap[char] || [];
       segmentsToTurnOn.forEach(selector => {
         svgElement.querySelector(selector).classList.add('on');
@@ -391,7 +386,6 @@
     }
 
     function update7SegmentDisplay(valueNum) {
-      // If user clears the box, blank the display to prevent errors
       if (isNaN(valueNum)) {
         setDigit(dig0, ' ');
         setDigit(dig1, ' ');
@@ -399,45 +393,35 @@
         return;
       }
       
-      // Clamp display while typing to prevent layout breaks
       let displayVal = valueNum;
       if (displayVal > 99.9) displayVal = 99.9;
 
-      // Force exactly 1 decimal place (e.g., 5.0 or 45.2)
       let str = displayVal.toFixed(1);
       
-      // Pad with space if it's a single digit before decimal (e.g. " 5.0")
       if (displayVal < 10) {
         str = " " + str;
       }
 
-      // str is guaranteed to be 4 characters: [Tens, Units, '.', Tenths]
-      // safely extract the correct characters for each digit SVG
       setDigit(dig0, str[0]);
       setDigit(dig1, str[1]); 
       setDigit(dig2, str[3]);
     }
 
     // --- Interaction Handlers ---
-    
-    // 1. User drags slider
     clockSlider.addEventListener('input', () => {
       const val = parseFloat(clockSlider.value);
       clockInput.value = val; 
       update7SegmentDisplay(val); 
     });
 
-    // 2. User types in the box (live update)
     clockInput.addEventListener('input', () => {
       let val = parseFloat(clockInput.value);
       
       if (isNaN(val)) {
-        // Just blank the display so they can keep typing comfortably
         setDigit(dig0, ' '); setDigit(dig1, ' '); setDigit(dig2, ' ');
       } else {
         update7SegmentDisplay(val);
         
-        // Sync slider safely
         let sliderVal = val;
         if (sliderVal < 0.2) sliderVal = 0.2;
         if (sliderVal > 50) sliderVal = 50;
@@ -445,11 +429,9 @@
       }
     });
 
-    // 3. User finishes typing (strict clamping)
     clockInput.addEventListener('change', () => {
       let val = parseFloat(clockInput.value);
       
-      // Apply bounds constraints to clamp to hardware limits
       if (isNaN(val) || val < 0.2) val = 0.2;
       if (val > 50) val = 50;
       
@@ -458,8 +440,7 @@
       update7SegmentDisplay(val); 
     });
 
-
-    // --- Easter Egg & Clock Hand Animation Logic ---
+    // --- Clock Hand Animation Logic ---
     let currentRotation = 0;
     let lastTime = performance.now();
     
@@ -474,54 +455,45 @@
 
       const hz = parseFloat(clockSlider.value) || 0.2;
 
-      // EASTER EGG LOGIC
       if (hz >= 50) {
         timeAtMax += deltaTime;
       } else {
-        // User turned it down, reset the emergency!
         timeAtMax = 0;
         if (handFlewOff) {
           handFlewOff = false;
-          flyOffX = 0; flyOffY = 0; // reset position
+          flyOffX = 0; flyOffY = 0; 
         }
       }
 
-      // 1. Wobble warning before failure (1.5 seconds at Max)
       let wobble = 0;
       if (timeAtMax > 1500 && !handFlewOff) {
-        wobble = Math.sin(timeAtMax * 0.05) * 8; // Violent shaking
+        wobble = Math.sin(timeAtMax * 0.05) * 8; 
       }
 
-      // 2. Critical Failure Threshold (2.5 seconds at 50Hz) -> FLY OFF SCREEN
       if (timeAtMax > 2500 && !handFlewOff) {
         handFlewOff = true;
-        flyOffVX = 15; // Shoot right
-        flyOffVY = -20; // Shoot up
+        flyOffVX = 15; 
+        flyOffVY = -20; 
         flyRotation = currentRotation;
       }
 
-      // Render Frame
       if (handFlewOff) {
-        // Physics for flying hand
         flyOffX += flyOffVX;
         flyOffY += flyOffVY;
-        flyOffVY += 1; // simple gravity simulation pulls it down
-        flyRotation += 45; // Spinning wildly out of control
+        flyOffVY += 1; 
+        flyRotation += 45; 
         
         clockHand.setAttribute('transform', `translate(${flyOffX}, ${flyOffY}) rotate(${flyRotation}, 100, 100)`);
       } else {
-        // Standard spinning logic
         const degreesToRotate = hz * 360 * (deltaTime / 1000);
         currentRotation = (currentRotation + degreesToRotate) % 360;
         
-        // Combine normal spin with any wobble from Max speed
         clockHand.setAttribute('transform', `rotate(${currentRotation + wobble}, 100, 100)`);
       }
 
       requestAnimationFrame(animateClockHand);
     }
 
-    // Initialize display and start animation
     update7SegmentDisplay(1.0);
     requestAnimationFrame(animateClockHand);
 
