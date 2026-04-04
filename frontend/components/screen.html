@@ -3,106 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Peripheral Interface Component</title>
+  <title>Display Component</title>
   
   <style>
-    /* General Layout */
+    /* --- GENERAL LAYOUT --- */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: transparent; /* Light theme integration */
+      background-color: transparent; 
       color: #333333;
       display: flex;
       justify-content: center;
-      padding: 20px;
+      padding: 10px; 
+      margin: 0;
+      height: 100vh; /* Locks to the iframe boundary */
+      box-sizing: border-box;
+      overflow: hidden; /* Banishes scrollbars */
     }
 
-    /* Outer Container */
+    /* --- OUTER CONTAINER (FRAMED) --- */
     .peripheral-container {
-      width: 400px;
-      border: none; /* Borders handled by mainframe panel */
-      background-color: transparent; 
-      padding: 10px;
+      width: 100%;
+      height: 100%;
+      border: 2px solid #5a5475; /* Standard module border */
+      border-radius: 8px;
+      background-color: #ffffff; 
+      padding: 20px; 
       display: flex;
       flex-direction: column;
-      align-items: center;
+      gap: 15px; 
       box-sizing: border-box;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.02);
     }
 
     .main-title {
-      display: none; /* Handled by mainframe panel header */
+      font-family: 'Courier New', Courier, monospace;
+      margin: 0;
+      font-size: 20px;
+      font-weight: bold;
+      color: #333333;
+      text-align: center;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      flex-shrink: 0; 
     }
 
-    /* --- 5-SLOT 7-SEGMENT DISPLAY STYLES --- */
+    /* --- 7-SEGMENT DISPLAY --- */
     .display-wrapper {
       width: 100%;
-      display: block; /* Visible by default to match reference image */
-      margin-bottom: 20px;
+      height: 100px;
+      display: flex;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
     .segmented-display-area {
-      border: 2px solid #75b8b6; /* Teal border matching reference */
+      border: 2px solid #75b8b6; 
       border-radius: 6px;
-      background-color: #ffffff; /* White display screen */
-      padding: 15px;
+      background-color: #ffffff; 
+      padding: 10px;
       display: flex;
-      justify-content: center;
-      gap: 12px; 
+      justify-content: space-evenly; 
+      align-items: center;
+      width: 100%;
+      height: 100%; 
       box-sizing: border-box;
       box-shadow: inset 0 1px 4px rgba(0,0,0,0.05);
     }
 
-    /* 7-Segment SVG Styles */
     .seg-digit {
-      width: 45px;
-      height: 75px;
+      height: 90%; 
+      width: auto;
+      max-width: 18%; 
     }
 
     .seg {
-      fill: #eef0f5; /* UNLIT STATE: Faint grey */
+      fill: #eef0f5; 
       transition: fill 0.1s ease;
     }
 
-    /* Lit state triggered by JS */
     .seg.on {
-      fill: #2dd4bf; /* LIT STATE: Bright cyan */
+      fill: #2dd4bf; 
       filter: drop-shadow(0 0 2px rgba(45, 212, 191, 0.3));
     }
 
-    .display-separator {
-      display: none !important; /* Hide old separator line */
-    }
-
-    /* --- KEYPAD STYLES --- */
+    /* --- KEYPAD --- */
     .keypad-wrapper {
       width: 100%;
-      background-color: transparent; 
-      padding: 0;
-      border-radius: 8px;
+      flex-grow: 1; /* Spring-loads the keypad to fill remaining frame height */
+      display: flex;
+      flex-direction: column;
       box-sizing: border-box;
-      border: none;
-      display: block; /* Visible by default */
     }
 
     .keypad-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr); 
-      gap: 10px;
+      grid-template-rows: repeat(4, 1fr); 
+      gap: 12px; 
+      flex-grow: 1; 
+      height: 100%; 
     }
 
-    /* Base button styles matching reference image */
     .btn {
       background-color: #ffffff;
-      color: #5a5475; /* Purple/grey text */
-      border: 2px solid #d28a5e; /* Orange/brown border */
-      padding: 12px 10px;
+      color: #5a5475; 
+      border: 2px solid #d28a5e; 
       cursor: pointer;
-      border-radius: 4px;
-      font-size: 16px;
+      border-radius: 6px;
+      font-size: 22px; 
       font-weight: bold;
       transition: all 0.2s ease;
-      text-align: center;
-      box-sizing: border-box;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%; 
+      padding: 0; 
     }
 
     .btn:hover:not(.btn-blank) {
@@ -110,7 +126,6 @@
       color: #d28a5e;
     }
 
-    /* The empty placeholder button box next to '6' */
     .btn-blank {
       border: 2px solid #e2e2ec;
       background-color: transparent;
@@ -118,52 +133,20 @@
       box-shadow: none;
     }
 
-    /* Enter button spanning 2 rows */
     .btn-enter {
       grid-column: 4;
       grid-row: span 2; 
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
-    /* Zero button spanning 2 columns */
     .btn-zero {
       grid-column: span 2; 
-    }
-
-    /* --- TOGGLE BUTTONS --- */
-    .toggle-controls {
-      display: flex;
-      gap: 10px;
-      width: 100%;
-      margin-top: 20px; 
-    }
-
-    .reveal-btn {
-      flex: 1; 
-      background-color: #ffffff;
-      color: #5a5475;
-      border: 2px solid #5a5475;
-      padding: 8px 10px;
-      font-size: 14px;
-      font-weight: bold;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: center;
-    }
-
-    .reveal-btn:hover {
-      background-color: #eef0f5;
-      color: #333333;
     }
   </style>
 </head>
 <body>
 
   <div class="peripheral-container">
-    <h2 class="main-title">Peripheral Interface</h2>
+    <h2 class="main-title">DISPLAY</h2>
 
     <div class="display-wrapper" id="display-wrapper">
       <div class="segmented-display-area">
@@ -221,15 +204,13 @@
       </div>
     </div>
     
-    <div class="display-separator" id="display-separator"></div>
-
     <div class="keypad-wrapper" id="keypad-wrapper">
       <div class="keypad-grid">
         
         <button class="btn">7</button>
         <button class="btn">8</button>
         <button class="btn">9</button>
-        <button class="btn">Clear</button>
+        <button class="btn" style="font-size: 18px;">Clear</button>
 
         <button class="btn">4</button>
         <button class="btn">5</button>
@@ -239,7 +220,7 @@
         <button class="btn">1</button>
         <button class="btn">2</button>
         <button class="btn">3</button>
-        <button class="btn btn-enter">Enter</button>
+        <button class="btn btn-enter" style="font-size: 18px;">Enter</button>
 
         <button class="btn btn-zero">0</button>
         <button class="btn">.</button>
@@ -247,15 +228,10 @@
       </div>
     </div>
 
-    <div class="toggle-controls">
-      <button class="reveal-btn" id="toggle-display-btn">Hide Display</button>
-      <button class="reveal-btn" id="toggle-keypad-btn">Hide Keypad</button>
-    </div>
-
   </div>
 
   <script>
-    // Elements
+
     const toggleDisplayBtn = document.getElementById('toggle-display-btn');
     const toggleKeypadBtn = document.getElementById('toggle-keypad-btn');
     
@@ -299,3 +275,6 @@
 
 </body>
 </html>
+
+
+

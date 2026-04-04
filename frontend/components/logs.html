@@ -6,273 +6,148 @@
   <title>Network Logs Component</title>
   
   <style>
-    /* --- GENERAL PAGE LAYOUT & LIGHT AESTHETIC --- */
+    /* --- RAW IC HARDWARE AESTHETIC --- */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: transparent; 
+      background-color: #ffffff; 
+      border: 2px solid #5a5475; /* Signature blueprint border */
+      border-radius: 8px; /* Smooth IC corners */
       color: #333333;
       display: flex;
-      justify-content: center;
-      padding: 20px; /* Reduced from 40px to fit modular layout better */
-      margin: 0;
-    }
-
-    /* --- SHARED MODULE STYLING --- */
-    .sim-module {
-      border: 2px solid #5a5475; 
-      border-radius: 8px;
-      background: #ffffff; 
-      padding: 25px;
-      display: flex;
       flex-direction: column;
-      align-items: center;
+      margin: 0;
+      height: 100vh; /* Fills the exact modal height */
       box-sizing: border-box;
-      position: relative;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+      overflow: hidden; /* Banishes scrollbars */
     }
 
-    .module-title {
-      font-family: 'Courier New', Courier, monospace;
-      margin-top: 0;
-      margin-bottom: 20px;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      text-align: center;
-      color: #5a5475;
+    /* --- SLEEK IC HEADER --- */
+    .ic-header {
+      background-color: #f8f8fc; /* Slight contrast for header */
+      border-bottom: 2px solid #e2e2ec; 
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .btn-action {
-      background-color: #ffffff;
-      color: #5a5475;
-      border: 2px solid #5a5475;
-      padding: 10px 20px;
-      cursor: pointer;
-      border-radius: 4px;
+    .ic-title {
       font-size: 14px;
       font-weight: bold;
-      transition: all 0.2s ease;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      width: 100%;
-      margin-top: 15px;
-    }
-
-    .btn-action:hover {
-      background-color: #eef0f5;
       color: #333333;
+      letter-spacing: 0.5px;
     }
 
-    /* --- LOG MODULE SPECIFIC STYLES --- */
-    .log-module {
-      width: 650px; /* Matches the exact width of the LAN module */
-      height: 500px; 
+    /* Circular 'X' close button like the IR Inspector */
+    .ic-close-btn {
+      background: #eef0f5;
+      border: 1px solid #b8b4c7;
+      border-radius: 50%; /* Perfect circle */
+      width: 24px;
+      height: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #5a5475;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
     }
 
-    .log-contents {
-      width: 100%;
+    .ic-close-btn:hover {
+      background: #c95c5a;
+      color: #ffffff;
+      border-color: #c95c5a;
+    }
+
+    /* --- IC BODY --- */
+    .ic-body {
+      padding: 15px;
+      flex-grow: 1;
       display: flex;
       flex-direction: column;
-      flex-grow: 1;
-      overflow: hidden; 
-      transition: visibility 0s, opacity 0.2s linear;
+      background-color: #ffffff;
+      overflow: hidden;
     }
 
-    /* Table Container with Custom Scrollbar */
-    .table-container {
+    /* --- LOGS TABLE WRAPPER --- */
+    .logs-wrapper {
       width: 100%;
-      flex-grow: 1;
-      background-color: #ffffff; 
-      border: 1px solid #b8b4c7; 
+      flex-grow: 1; /* Spring-loads the table to fill all space */
+      border: 1px solid #b8b4c7;
       border-radius: 4px;
-      overflow-y: auto; 
-      overflow-x: hidden;
-      box-sizing: border-box; 
+      overflow-y: auto;
+      background-color: #ffffff;
     }
 
-    /* Webkit Scrollbar Styling for a hardware feel (Light Theme) */
-    .table-container::-webkit-scrollbar {
-      width: 8px;
-    }
-    .table-container::-webkit-scrollbar-track {
-      background: #f0f0f5; 
-      border-left: 1px solid #e2e2ec;
-    }
-    .table-container::-webkit-scrollbar-thumb {
-      background: #b8b4c7; 
-      border-radius: 4px;
-    }
-    .table-container::-webkit-scrollbar-thumb:hover {
-      background: #5a5475; 
-    }
-
-    /* Table Styling */
-    .log-table {
+    table {
       width: 100%;
       border-collapse: collapse;
-      table-layout: fixed; 
       font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
-      text-align: left;
-      margin: 0;
+      font-size: 12px;
     }
 
-    .log-table th {
+    th {
       background-color: #eef0f5;
       color: #5a5475;
-      padding: 10px 15px;
+      padding: 10px;
+      text-align: left;
       border-bottom: 1px solid #b8b4c7;
       border-right: 1px solid #e2e2ec;
       position: sticky; 
       top: 0;
-      z-index: 2;
-      text-transform: uppercase;
-      letter-spacing: 1px;
       font-weight: bold;
     }
 
-    .log-table th:last-child {
-      border-right: none;
+    th:last-child { 
+      border-right: none; 
     }
 
-    .log-table td {
-      padding: 8px 15px;
-      border-bottom: 1px solid #e2e2ec;
-      border-right: 1px solid #e2e2ec;
-      word-wrap: break-word; 
-      color: #333333;
-    }
-
-    .log-table td:last-child {
-      border-right: none;
-    }
-
-    /* Alternating row colors for readability */
-    .log-table tbody tr:nth-child(even) {
-      background-color: #f8f8fc; 
-    }
-    .log-table tbody tr:nth-child(odd) {
-      background-color: #ffffff;
-    }
-
-    .log-table tr:hover td {
-      background-color: #fff3e0; /* Slight orange tint on hover to match keypad/CPU theme */
-    }
-
-    /* Specific Column Data Styling */
-    .col-time {
+    td {
+      padding: 12px 10px;
       color: #888888;
-      width: 25%;
-    }
-
-    .col-source {
-      color: #5a5475; 
-      font-weight: bold;
-      width: 20%;
-    }
-
-    .col-data {
-      color: #333333;
-      font-weight: bold;
-      width: 35%;
-    }
-
-    .col-status {
-      font-weight: bold;
-      width: 20%;
-    }
-
-    /* Status Colors adjusted for light theme visibility */
-    .status-success { color: #2b7a4b; } /* Darker green */
-    .status-error { color: #b0413e; }   /* Darker red */
-    .status-pending { color: #d28a5e; } /* Orange */
-
-    /* Empty state styling */
-    .empty-log {
       text-align: center;
-      padding: 20px !important;
-      color: #888888 !important;
       font-style: italic;
+      border-bottom: 1px solid #e2e2ec;
     }
-
   </style>
 </head>
 <body>
 
-  <div class="log-module sim-module" id="log-module">
-    <h2 class="module-title">NETWORK LOGS</h2>
+  <div class="ic-header">
+    <div class="ic-title">Network Logs</div>
+    <button class="ic-close-btn" id="hide-logs-btn">✕</button>
+  </div>
 
-    <div class="log-contents" id="log-contents">
-      
-      <div class="table-container">
-        <table class="log-table">
-          <thead>
-            <tr>
-              <th class="col-time">Timestamp</th>
-              <th class="col-source">Source</th>
-              <th class="col-data">Data Payload</th>
-              <th class="col-status">Status</th>
-            </tr>
-          </thead>
-          <tbody id="log-table-body">
-            <tr id="empty-state-row">
-              <td colspan="4" class="empty-log">Awaiting network activity...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
+  <div class="ic-body">
+    <div class="logs-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>TIMESTAMP</th>
+            <th>SOURCE</th>
+            <th>DATA PAYLOAD</th>
+            <th>STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="logs-body">
+          <tr>
+            <td colspan="4">Awaiting network activity...</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-
-    <button id="toggle-logs-btn" class="btn-action">Hide Logs</button>
-
   </div>
 
   <script>
-    const toggleLogsBtn = document.getElementById('toggle-logs-btn');
-    const logContents = document.getElementById('log-contents');
-    const logTableBody = document.getElementById('log-table-body');
-    const emptyStateRow = document.getElementById('empty-state-row');
-
-    // --- Show/Hide Logic ---
-    toggleLogsBtn.addEventListener('click', () => {
-      // visibility hidden retains the physical dimensions of the module
-      if (logContents.style.visibility === 'hidden') {
-        logContents.style.visibility = 'visible';
-        logContents.style.opacity = '1';
-        toggleLogsBtn.textContent = 'Hide Logs';
-      } else {
-        logContents.style.visibility = 'hidden';
-        logContents.style.opacity = '0';
-        toggleLogsBtn.textContent = 'Show Logs';
+    // --- SECURE MODAL CLOSE LOGIC ---
+    // Fires a message to the Mainframe telling it to close the modal
+    document.getElementById('hide-logs-btn').addEventListener('click', function() {
+      if (window.parent) {
+        window.parent.postMessage({ action: 'closeNetworkLogsPopup' }, '*');
       }
     });
-
-    // --- Helper Function to Add a New Log Entry ---
-    function addLog(source, data, status) {
-      if (emptyStateRow && emptyStateRow.parentNode) {
-        emptyStateRow.parentNode.removeChild(emptyStateRow);
-      }
-
-      const now = new Date();
-      const timeString = now.toTimeString().split(' ')[0]; 
-
-      const tr = document.createElement('tr');
-
-      let statusClass = 'status-pending';
-      if (status.toLowerCase() === 'success') statusClass = 'status-success';
-      if (status.toLowerCase() === 'error') statusClass = 'status-error';
-
-      tr.innerHTML = `
-        <td class="col-time">[${timeString}]</td>
-        <td class="col-source">COMPUTER ${source}</td>
-        <td class="col-data">${data}</td>
-        <td class="col-status ${statusClass}">${status.toUpperCase()}</td>
-      `;
-
-      logTableBody.insertBefore(tr, logTableBody.firstChild);
-    }
-
   </script>
 
 </body>

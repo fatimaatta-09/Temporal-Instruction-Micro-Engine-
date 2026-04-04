@@ -13,7 +13,7 @@
       color: #333333; 
       display: flex;
       justify-content: center;
-      padding: 10px; /* Matched exactly to Hard Disk */
+      padding: 10px; 
       margin: 0;
       box-sizing: border-box;
       height: 100vh;
@@ -25,7 +25,7 @@
     .app-container {
       width: 100%;
       height: 100%;
-      border: 2px solid #5a5475; /* Added the signature blueprint border! */
+      border: 2px solid #5a5475; 
       border-radius: 8px;
       background-color: #ffffff;
       padding: 20px;
@@ -45,24 +45,26 @@
       color: #333333;
       text-align: center;
       letter-spacing: 1px;
+      flex-shrink: 0;
     }
 
     /* --- MEMORY WRAPPER --- */
     .memory-block {
       width: 100%;
-      flex-grow: 1; /* Takes all available space between title and Show button */
+      flex-grow: 1; 
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      overflow: hidden; /* Banishes scrollbars */
+      overflow: hidden; 
       box-sizing: border-box;
     }
 
     .ram-module {
       width: 100%;
       height: 100%;
+      display: flex; 
+      flex-direction: column;
       box-sizing: border-box;
-      display: none; /* Hidden until 'Show' is clicked */
     }
 
     /* --- CONTROLS --- */
@@ -72,11 +74,12 @@
       align-items: center;
       margin-bottom: 12px;
       padding: 0 5px;
+      flex-shrink: 0;
     }
 
     .ram-controls label {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
+      font-size: 14px;
       color: #5a5475;
       font-weight: bold;
       display: flex;
@@ -89,100 +92,73 @@
       background-color: #ffffff;
       color: #c95c5a; 
       border: 1px solid #c95c5a;
-      padding: 4px 14px;
+      padding: 6px 16px;
       border-radius: 4px;
       font-weight: bold;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 13px;
       transition: all 0.2s ease;
       text-transform: uppercase;
     }
 
-    .clear-btn:hover {
-      background-color: #fff0f0;
-    }
+    .clear-btn:hover { background-color: #fff0f0; }
 
-    /* --- COMPACT MEMORY GRID --- */
+    /* --- ENLARGED MEMORY GRID --- */
     .ram-grid {
       display: flex;
-      gap: 20px; /* Space between the two columns */
+      gap: 15px; /* REDUCED GAP to prevent overflow */
       width: 100%;
-      height: calc(100% - 35px); /* Fills remaining space below controls */
-      overflow: hidden; /* No scrollbars */
+      flex-grow: 1; 
+      overflow: hidden; 
     }
 
     .ram-column {
       display: flex;
       flex-direction: column;
-      flex: 1; /* Forces both columns to stretch perfectly to 50% width */
-      justify-content: space-between; /* Spreads 16 inputs evenly across the height */
+      flex: 1; 
+      justify-content: space-between; 
+      min-width: 0; /* Ensures column obeys flex bounds */
     }
 
     .ram-cell {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 22px; /* Super compact to fit inside the .exe height */
+      height: 32px; 
     }
 
     .ram-cell label {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 12px;
+      font-size: 15px; 
       font-weight: bold;
       color: #5a5475;
-      width: 25px;
+      width: 20px; /* Slightly tighter width */
       text-align: right;
       flex-shrink: 0;
     }
 
     .ram-input {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
+      font-size: 15px; /* Scaled down just a hair for perfect fit */
       color: #3b7c97; 
       border: 1px solid #b8b4c7;
-      border-radius: 3px;
-      padding: 2px 6px;
-      height: 20px;
-      flex-grow: 1; /* STRETCHES INPUT TO FULL WIDTH */
-      margin-left: 10px;
+      border-radius: 4px;
+      padding: 4px 6px;
+      height: 28px; 
+      flex-grow: 1; 
+      min-width: 0; /* CRITICAL: Forces the input to shrink inside its container */
+      margin-left: 8px; /* Tighter margin */
       text-align: center;
       background-color: #f8f8fc;
       font-weight: bold;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
       outline: none;
       transition: border-color 0.2s, background-color 0.2s;
       box-sizing: border-box;
     }
     
-    .ram-input:focus {
-      outline: none;
-      border-color: #3b7c97;
-      background-color: #ffffff;
-    }
+    .ram-input:focus { border-color: #3b7c97; background-color: #ffffff; }
 
-    /* --- SHOW/HIDE BUTTON --- */
-    .bottom-action {
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    .show-btn {
-      background-color: #ffffff;
-      color: #5a5475;
-      border: 2px solid #5a5475;
-      padding: 10px 40px;
-      font-size: 16px;
-      font-weight: bold;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      width: 100%; /* Stretches button across bottom */
-    }
-
-    .show-btn:hover {
-      background-color: #eef0f5;
-      color: #333333;
-    }
   </style>
 </head>
 <body>
@@ -191,21 +167,15 @@
     <h2 class="main-title">Main Memory (RAM)</h2>
     
     <div class="memory-block" id="memory-block">
-      
       <div class="ram-module" id="ram-module">
         <div class="ram-controls">
           <label><input type="checkbox" id="mnemonics-cb"> Mnemonics</label>
           <button class="clear-btn" id="clear-btn">Clear</button>
         </div>
-
         <div class="ram-grid" id="ram-grid"></div>
       </div>
-
     </div>
-
-    <div class="bottom-action">
-      <button class="btn show-btn" id="show-btn">Show</button>
-    </div>
+    
   </div>
 
   <script>
@@ -237,7 +207,6 @@
     ramGrid.appendChild(column1);
     ramGrid.appendChild(column2);
 
-
     // --- CLEAR BUTTON LOGIC ---
     const clearBtn = document.getElementById('clear-btn');
     clearBtn.addEventListener('click', function() {
@@ -245,11 +214,9 @@
       const mnemonicsCb = document.getElementById('mnemonics-cb');
       
       allInputs.forEach(input => {
-        // If mnemonics is checked, clear leaves it empty. Otherwise, sets to 0s.
         input.value = mnemonicsCb.checked ? '' : '00000000';
       });
     });
-
 
     // --- MNEMONICS CHECKBOX LOGIC ---
     const mnemonicsCb = document.getElementById('mnemonics-cb');
@@ -257,28 +224,12 @@
       const allInputs = document.querySelectorAll('.ram-input');
       
       if (this.checked) {
-        // If checked, clear the values
         allInputs.forEach(input => input.value = '');
       } else {
-        // If unchecked, return back to zeroes
         allInputs.forEach(input => input.value = '00000000');
       }
     });
 
-
-    // --- SHOW / HIDE FUNCTIONALITY ---
-    const showBtn = document.getElementById('show-btn');
-    const ramModule = document.getElementById('ram-module');
-
-    showBtn.addEventListener('click', function() {
-      if (ramModule.style.display === 'none' || ramModule.style.display === '') {
-        ramModule.style.display = 'block';
-        showBtn.textContent = 'Hide'; 
-      } else {
-        ramModule.style.display = 'none';
-        showBtn.textContent = 'Show'; 
-      }
-    });
   </script>
 
 </body>

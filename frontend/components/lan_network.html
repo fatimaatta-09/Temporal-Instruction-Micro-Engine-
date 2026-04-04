@@ -121,7 +121,6 @@
       background-color: #00d2ff; 
       border-radius: 2px; 
       transform: translate(-50%, -50%); 
-      /* Pushed behind the PC node so they emerge naturally from the bottom */
       z-index: 1; 
       pointer-events: none;
     }
@@ -131,7 +130,6 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      /* PC nodes are layered above the data flows and canvas */
       z-index: 2; 
       position: absolute;
     }
@@ -357,6 +355,26 @@
       flex-grow: 1;
     }
 
+    /* --- LOGS BUTTON AT BOTTOM OF LAN --- */
+    .lan-footer {
+      width: 100%;
+      margin-top: auto; /* Pushes button to the very bottom */
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+    }
+
+    .btn-logs {
+      background-color: #f8f8fc;
+      color: #3b7c97;
+      border-color: #3b7c97;
+      max-width: 300px; /* Prevents it from being too wide */
+    }
+
+    .btn-logs:hover {
+      background-color: #3b7c97;
+      color: #ffffff;
+    }
   </style>
 </head>
 <body>
@@ -429,6 +447,11 @@
             </svg>
           </div>
         </div>
+        
+        <div class="lan-footer">
+          <button id="show-logs-btn" class="btn-action btn-logs">View Network Logs</button>
+        </div>
+
       </div> 
     </div>
 
@@ -466,6 +489,7 @@
     // --- Layout & Visibility State Logic ---
     const toggleNcBtn = document.getElementById('toggle-nc-btn');
     const togglePcsBtn = document.getElementById('toggle-pcs-btn');
+    const showLogsBtn = document.getElementById('show-logs-btn'); 
     const ncContents = document.getElementById('nc-contents');
     const lanAnimWrapper = document.getElementById('lan-anim-wrapper');
 
@@ -492,6 +516,14 @@
       } else {
         lanAnimWrapper.classList.add('open');
         togglePcsBtn.textContent = 'Hide PCs';
+      }
+    });
+
+    // --- SECURE BYPASS FOR POPUP MODAL ---
+    // Uses postMessage to bypass cross-origin browser security locks for local files
+    showLogsBtn.addEventListener('click', function() {
+      if (window.parent) {
+        window.parent.postMessage({ action: 'toggleNetworkLogsPopup' }, '*');
       }
     });
 
@@ -557,13 +589,12 @@
 
         const packets = [];
         
-        // 1. Generate the 4 packets perfectly hidden at the start
         for (let i = 0; i < 4; i++) {
             const p = document.createElement('div');
             p.className = 'data-flow';
             p.style.left = firstLegPath[0].x + 'px';
             p.style.top = firstLegPath[0].y + 'px';
-            p.style.opacity = '0'; // Keep hidden until it starts moving
+            p.style.opacity = '0'; 
             
             const startVertical = Math.abs(firstLegPath[1].y - firstLegPath[0].y) > Math.abs(firstLegPath[1].x - firstLegPath[0].x);
             p.style.transform = `translate(-50%, -50%) rotate(${startVertical ? 90 : 0}deg)`;
@@ -572,25 +603,21 @@
             packets.push(p);
         }
 
-        // 2. Move to receiving PC, staggered
         const moveFirstLeg = packets.map(async (packet, index) => {
             await sleep(index * 400); 
-            packet.style.opacity = '1'; // Show exactly when it departs from the PC base
+            packet.style.opacity = '1'; 
             await animatePacket(packet, firstLegPath);
-            packet.style.opacity = '0'; // Hide again once it arrives inside the destination PC
+            packet.style.opacity = '0'; 
         });
         await Promise.all(moveFirstLeg);
 
-        // 3. Pause at the receiving PC
         await sleep(600);
 
-        // 4. Move from receiving PC to Network Card Frame Buffer, staggered again
         const moveSecondLeg = packets.map(async (packet, index) => {
             await sleep(index * 400);
-            packet.style.opacity = '1'; // Show exactly when it departs for the buffer
+            packet.style.opacity = '1'; 
             await animatePacket(packet, secondLegPath);
             
-            // Fade out and delete when they hit the buffer
             packet.style.transition = 'opacity 0.3s ease';
             packet.style.opacity = '0';
             setTimeout(() => packet.remove(), 300);

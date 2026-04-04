@@ -1,221 +1,308 @@
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>4-Bit Operational Core Simulator</title>
-        <style>
-            /* --- MAINFRAME BLUEPRINT THEME --- */
-            body {
-                background-color: #f0f0f5;
-                margin: 0;
-                padding: 20px;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                box-sizing: border-box;
-                background-image:
-                    linear-gradient(#e2e2ec 1px, transparent 1px),
-                    linear-gradient(90deg, #e2e2ec 1px, transparent 1px);
-                background-size: 20px 20px;
-            }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Bit Operational Core Simulator</title>
+    <style>
+        /* --- MAINFRAME BLUEPRINT THEME --- */
+        body {
+            background-color: #f0f0f5;
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            background-image:
+                linear-gradient(#e2e2ec 1px, transparent 1px),
+                linear-gradient(90deg, #e2e2ec 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
 
-            .app-window {
-                width: 1800px; 
-                height: 950px;
-                background-color: #ffffff;
-                border: 2px solid #5a5475; 
-                border-radius: 8px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                transform-origin: center center;
-            }
+        .app-window {
+            width: 1800px; 
+            height: 950px;
+            background-color: #ffffff;
+            border: 2px solid #5a5475; 
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform-origin: center center;
+            position: relative; 
+        }
 
-            .title-bar {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                background-color: #f8f8fc;
-                border-bottom: 2px solid #5a5475;
-                padding: 8px 15px;
-            }
+        .title-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f8f8fc;
+            border-bottom: 2px solid #5a5475;
+            padding: 8px 15px;
+        }
 
-            .title-text {
-                font-size: 22px;
-                font-weight: bold;
-                color: #333333;
-                letter-spacing: 0.5px;
-            }
+        .title-text {
+            font-size: 22px;
+            font-weight: bold;
+            color: #333333;
+            letter-spacing: 0.5px;
+        }
 
-            .dashboard-layout {
-                display: flex;
-                flex-grow: 1;
-                padding: 15px;
-                gap: 15px;
-                background-color: transparent;
-            }
+        .title-btn {
+            background: #ffffff;
+            border: 2px solid #b8b4c7;
+            border-radius: 4px;
+            width: 32px;
+            height: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #5a5475;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
-            .panel {
-                border: 2px solid #5a5475;
-                border-radius: 6px;
-                background-color: #ffffff;
-                display: block; 
-                position: relative;
-                overflow: hidden;
-            }
+        .title-btn-group { 
+            display: flex; 
+            gap: 8px; 
+        }
 
-            .panel-header {
-                text-align: center;
-                padding: 8px;
-                height: 35px; 
-                border-bottom: 1px solid #5a5475;
-                font-weight: 600;
-                font-size: 14px;
-                color: #333;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                background-color: #fdfdfd;
-                box-sizing: border-box;
-                position: absolute;
-                top: 0; left: 0; right: 0;
-                z-index: 10;
-            }
+        .dashboard-layout {
+            display: flex;
+            flex-grow: 1;
+            padding: 15px;
+            gap: 15px;
+            background-color: transparent;
+        }
 
-            .panel-left { width: 420px; flex-shrink: 0; }
-            .panel-center { width: calc(1800px - 420px - 450px - 60px); } 
-            .panel-right { width: 450px; flex-shrink: 0; }
+        .panel {
+            border: 2px solid #5a5475;
+            border-radius: 6px;
+            background-color: #ffffff;
+            display: block; 
+            position: relative;
+            overflow: hidden;
+        }
 
-            .iframe-container {
-                position: absolute;
-                top: 35px; 
-                bottom: 0; 
-                left: 0;
-                right: 0;
-                background-image:
-                    linear-gradient(#eef0f5 1px, transparent 1px),
-                    linear-gradient(90deg, #eef0f5 1px, transparent 1px);
-                background-size: 15px 15px;
-                overflow-y: auto; 
-                overflow-x: hidden;
-                padding: 15px 0;
-                box-sizing: border-box;
-            }
+        .panel-header {
+            text-align: center;
+            padding: 8px;
+            height: 35px; 
+            border-bottom: 1px solid #5a5475;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background-color: #fdfdfd;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            z-index: 10;
+        }
 
-            /* BANISH SCROLLBAR IN LEFT PANEL */
-            .panel-left .iframe-container {
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-                padding-top: 10px;
-            }
+        .panel-left { width: 420px; flex-shrink: 0; }
+        .panel-center { width: calc(1800px - 420px - 450px - 60px); } 
+        .panel-right { width: 450px; flex-shrink: 0; }
 
-            .panel-center .iframe-container { overflow: hidden; padding: 0; }
+        /* --- IFRAME CONTAINERS --- */
+        .iframe-container {
+            position: absolute;
+            top: 35px; 
+            bottom: 0; 
+            left: 0;
+            right: 0;
+            background-image:
+                linear-gradient(#eef0f5 1px, transparent 1px),
+                linear-gradient(90deg, #eef0f5 1px, transparent 1px);
+            background-size: 15px 15px;
+            overflow: hidden; 
+            box-sizing: border-box;
+        }
 
-            iframe { border: none; background: transparent; }
+        .panel-left .iframe-container,
+        .panel-right .iframe-container {
+            display: flex;
+            flex-direction: column;
+            padding: 10px 0;
+        }
 
-            .wrap {
-                display: block;
-                width: 100%;
-                position: relative;
-                margin-bottom: 10px; 
-            }
-            .wrap iframe {
-                position: absolute;
-                top: 0;
-                left: 50%; 
-            }
+        .panel-center .iframe-container { 
+            padding: 0; 
+        }
 
-            /* --- LEFT PANEL: PERFECT FIT CALCULATION --- */
-            .wrap-hd { 
-                height: 305px; /* Shrunk to perfectly fit internal content only */
-                flex-shrink: 0; 
-            } 
-            .wrap-hd iframe { 
-                width: 480px; 
-                height: 382px; /* Internal height matching HardDisk.html */
-                transform: translateX(-50%) scale(0.8); 
-                transform-origin: top center; 
-            }
+        iframe { border: none; background: transparent; }
+
+        .wrap {
+            display: block;
+            width: 100%;
+            position: relative;
+            margin-bottom: 10px; 
+        }
+
+        /* --- LEFT PANEL --- */
+        .wrap-hd { height: 325px; position: relative; flex-shrink: 0; } 
+        .wrap-hd iframe { width: 480px; height: calc(100% / 0.8); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.8); transform-origin: top center; }
+        
+        .wrap-ram { flex-grow: 1; position: relative; margin-bottom: 0; } 
+        .wrap-ram iframe { width: 530px; height: calc(100% / 0.72); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.72); transform-origin: top center; }
+
+        /* --- CENTER PANEL --- */
+        .cpu-wrap { width: 100%; height: calc(100% - 220px); position: relative; overflow: hidden; }
+        .cpu-iframe { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        
+        .wrap-clock { width: 100%; height: 220px; position: relative; overflow: hidden; margin: 0; padding: 0; }
+        .wrap-clock iframe { width: 1200px; height: 280px; position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.72); transform-origin: top center; }
+
+        /* --- RIGHT PANEL --- */
+        .wrap-screen { 
+            flex-grow: 1; 
+            position: relative; 
+            margin-bottom: 15px; 
+            min-height: 400px; 
+        } 
+        .wrap-screen iframe { width: 420px; height: 100%; position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
+        
+        .wrap-printer { height: 120px; position: relative; flex-shrink: 0; margin-bottom: 15px; } 
+        .wrap-printer iframe { width: 730px; height: calc(100% / 0.55); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.55); transform-origin: top center; }
+        
+        .wrap-lan { height: 210px; position: relative; flex-shrink: 0; margin-bottom: 5px; } 
+        .wrap-lan iframe { width: 1100px; height: calc(100% / 0.4); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.4); transform-origin: top center; }
+
+
+        /* --- UPDATED: BOTTOM-RIGHT CORNER POPUP (NO FROST) --- */
+        .logs-modal-overlay {
+            position: absolute; 
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: transparent; /* Frosted look completely removed */
+            backdrop-filter: none;
+            display: none; 
+            pointer-events: none; /* Allows you to click the simulator behind the popup! */
+            z-index: 1000;
+        }
+
+        .logs-modal-content {
+            position: absolute;
+            bottom: 30px; /* Snaps it to the bottom */
+            right: 30px; /* Snaps it to the right */
+            width: 550px; /* Slightly scaled down so it doesn't block too much */
+            height: 380px;
+            background: transparent;
+            border: none;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15); /* Clean hardware shadow */
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            pointer-events: auto; /* Re-enables clicking inside the popup itself */
+            animation: slideInCorner 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
+
+        /* Cool slide-in-from-corner animation */
+        @keyframes slideInCorner {
+            from { transform: translate(50px, 50px) scale(0.9); opacity: 0; }
+            to { transform: translate(0, 0) scale(1); opacity: 1; }
+        }
+
+        .wrap-logs-popup {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .wrap-logs-popup iframe {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px; 
+        }
+
+    </style>
+</head>
+<body>
+    <div class="app-window" id="app-window">
+        
+        <div class="title-bar">
+            <div class="title-btn-group"><button class="title-btn">☰</button></div>
+            <div class="title-text">4-BIT OPERATIONAL CORE SIMULATOR (v2.0)</div>
+            <div class="title-btn-group"><button class="title-btn">◀</button><button class="title-btn">⚙</button></div>
+        </div>
+
+        <div class="dashboard-layout">
             
-            .wrap-ram { 
-                flex-grow: 1; /* RAM takes all remaining vertical space */
-                margin-bottom: 0;
-            } 
-            .wrap-ram iframe { 
-                width: 530px; 
-                height: 100%; /* Dynamically fills the remaining panel height */
-                transform: translateX(-50%) scale(0.72); 
-                transform-origin: top center; 
-            }
-
-            /* --- CENTER PANEL --- */
-            .cpu-wrap { width: 100%; height: calc(100% - 220px); position: relative; overflow: hidden; }
-            .cpu-iframe { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-            .wrap-clock { width: 100%; height: 220px; position: relative; overflow: hidden; }
-            .wrap-clock iframe { width: 1200px; height: 280px; position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.72); transform-origin: top center; }
-
-            /* --- RIGHT PANEL --- */
-            .wrap-screen { height: 460px; } 
-            .wrap-screen iframe { width: 440px; height: 550px; transform: translateX(-50%) scale(0.95, 0.85); transform-origin: top center; }
-            .wrap-printer { height: 190px; } 
-            .wrap-printer iframe { width: 730px; height: 340px; transform: translateX(-50%) scale(0.57); transform-origin: top center; }
-            .wrap-lan { height: 310px; } 
-            .wrap-lan iframe { width: 690px; height: 520px; transform: translateX(-50%) scale(0.6); transform-origin: top center; }
-            .wrap-logs { height: 320px; } 
-            .wrap-logs iframe { width: 690px; height: 540px; transform: translateX(-50%) scale(0.6); transform-origin: top center; }
-        </style>
-    </head>
-    <body>
-        <div class="app-window" id="app-window">
-            <div class="title-bar">
-                <div class="title-text">4-BIT OPERATIONAL CORE SIMULATOR (v2.0)</div>
+            <div class="panel panel-left">
+                <div class="panel-header">PROJECT & DATA MANAGMENT</div>
+                <div class="iframe-container">
+                    <div class="wrap wrap-hd"><iframe src="components/HardDisk.html" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-ram"><iframe src="components/RAM.html" scrolling="no"></iframe></div>
+                </div>
             </div>
-            <div class="dashboard-layout">
-                <div class="panel panel-left">
-                    <div class="panel-header">PROJECT & DATA MANAGMENT</div>
-                    <div class="iframe-container">
-                        <div class="wrap wrap-hd">
-                            <iframe src="components/HardDisk.html" scrolling="no"></iframe>
-                        </div>
-                        <div class="wrap wrap-ram">
-                            <iframe src="components/RAM.html" scrolling="no"></iframe>
-                        </div>
-                    </div>
+            
+            <div class="panel panel-center">
+                <div class="panel-header">OPERATIONAL CORE SCHEMATIC</div>
+                <div class="iframe-container">
+                    <div class="cpu-wrap"><iframe src="components/cpu.html" class="cpu-iframe" scrolling="no"></iframe></div>
+                    <div class="wrap-clock"><iframe src="components/clock.html" scrolling="no"></iframe></div>
                 </div>
-                <div class="panel panel-center">
-                    <div class="panel-header">OPERATIONAL CORE SCHEMATIC</div>
-                    <div class="iframe-container">
-                        <div class="cpu-wrap">
-                            <iframe src="components/cpu.html" class="cpu-iframe" scrolling="no"></iframe>
-                        </div>
-                        <div class="wrap-clock">
-                            <iframe src="components/clock.html" scrolling="no"></iframe>
-                        </div>
-                    </div>
+            </div>
+            
+            <div class="panel panel-right">
+                <div class="panel-header">PERIPHERAL MODULES & LOGS</div>
+                <div class="iframe-container">
+                    <div class="wrap wrap-screen"><iframe src="components/screen.html" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-printer"><iframe src="components/printer.html" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-lan"><iframe src="components/lan_network.html" scrolling="no"></iframe></div>
                 </div>
-                <div class="panel panel-right">
-                    <div class="panel-header">PERIPHERAL MODULES & LOGS</div>
-                    <div class="iframe-container">
-                        <div class="wrap wrap-screen"><iframe src="components/screen.html" scrolling="no"></iframe></div>
-                        <div class="wrap wrap-printer"><iframe src="components/printer.html" scrolling="no"></iframe></div>
-                        <div class="wrap wrap-lan"><iframe src="components/lan_network.html" scrolling="no"></iframe></div>
-                        <div class="wrap wrap-logs"><iframe src="components/logs.html" scrolling="no"></iframe></div>
-                    </div>
+            </div>
+
+        </div>
+
+        <div class="logs-modal-overlay" id="logs-modal">
+            <div class="logs-modal-content">
+                <div class="wrap-logs-popup">
+                    <iframe src="components/logs.html" scrolling="no"></iframe>
                 </div>
             </div>
         </div>
-        <script>
-            function scaleDashboard() {
-                const appWindow = document.getElementById('app-window');
-                const scale = Math.min((window.innerWidth - 40) / 1800, (window.innerHeight - 40) / 950, 1); 
-                appWindow.style.transform = `scale(${scale})`;
+
+    </div>
+
+    <script>
+        function scaleDashboard() {
+            const appWindow = document.getElementById('app-window');
+            const scale = Math.min((window.innerWidth - 40) / 1800, (window.innerHeight - 40) / 950, 1); 
+            appWindow.style.transform = `scale(${scale})`;
+        }
+        window.addEventListener('resize', scaleDashboard);
+        scaleDashboard();
+
+        // Modal toggle logic (updated for display: block since we removed flex centering)
+        function toggleNetworkLogsPopup() {
+            const modal = document.getElementById('logs-modal');
+            if (modal.style.display === 'block') {
+                modal.style.display = 'none';
+            } else {
+                modal.style.display = 'block';
             }
-            window.addEventListener('resize', scaleDashboard);
-            scaleDashboard();
-        </script>
-    </body>
-    </html>
+        }
+
+        // Dedicated close function called securely from logs.html
+        function closeNetworkLogsPopup() {
+            document.getElementById('logs-modal').style.display = 'none';
+        }
+
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'toggleNetworkLogsPopup') {
+                toggleNetworkLogsPopup();
+            } else if (event.data && event.data.action === 'closeNetworkLogsPopup') {
+                closeNetworkLogsPopup();
+            }
+        });
+    </script>
+</body>
+</html>

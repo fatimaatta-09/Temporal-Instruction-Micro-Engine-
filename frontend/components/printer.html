@@ -6,27 +6,31 @@
   <title>Printer Component</title>
   
   <style>
-    /* General Layout */
+    /* --- GENERAL LAYOUT --- */
     body {
       font-family: Arial, sans-serif;
-      background-color: transparent; /* Light theme integration */
-      color: #333333; /* Dark text */
+      background-color: transparent; 
+      color: #333333; 
       display: flex;
       justify-content: center;
-      padding: 40px;
+      padding: 10px;
+      margin: 0;
+      box-sizing: border-box;
+      overflow: hidden; /* Banishes scrollbars */
+      height: 100vh; /* Locks to iframe height */
     }
 
-    /* Outer Container - FIXED SIZE (Elongated on X-axis) */
+    /* --- OUTER CONTAINER (SHORTER HEIGHT) --- */
     .printer-container {
-      width: 650px; 
-      height: 260px; 
-      border: 2px solid #5a5475; /* Purple/Grey border from reference */
-      border-radius: 6px;
-      background-color: #ffffff; /* White panel */
+      width: 100%; 
+      height: 100%; 
+      border: 2px solid #5a5475; 
+      border-radius: 8px;
+      background-color: #ffffff; 
       padding: 20px;
       display: flex;
       box-sizing: border-box;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.02);
     }
 
     /* --- TWO-COLUMN LAYOUT --- */
@@ -46,13 +50,14 @@
       align-items: center;
       width: 220px;
       gap: 15px; 
+      flex-shrink: 0;
     }
 
     /* Title Banner */
     .title-banner {
       width: 100%;
       border: 2px solid #5a5475;
-      background-color: #eef0f5; /* Light header background */
+      background-color: #eef0f5; 
       color: #5a5475;
       padding: 8px;
       text-align: center;
@@ -69,7 +74,6 @@
       width: 200px;
       height: auto;
       display: block;
-      transition: visibility 0s, opacity 0.2s linear;
     }
 
     /* --- ANIMATION STYLES FOR THE PAPER --- */
@@ -87,16 +91,16 @@
       display: flex;
       flex-direction: column;
       flex-grow: 1; 
-      gap: 15px; 
+      height: 100%;
     }
 
-    /* Base button styles matching the light theme */
+    /* Base button styles */
     .btn {
       background-color: #ffffff;
       color: #5a5475;
       border: 2px solid #5a5475;
       cursor: pointer;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 15px;
       transition: all 0.2s ease;
       text-align: center;
@@ -116,21 +120,15 @@
       cursor: not-allowed;
     }
 
-    /* The large "Tear paper" area */
+    /* The large "Tear paper" area fills the whole right side */
     .btn-tear-paper {
       width: 100%;
-      flex-grow: 1; 
+      height: 100%; /* Stretches to fill the column perfectly */
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 16px;
-    }
-
-    /* Show/Hide Button at the bottom right */
-    .btn-show-hide {
-      width: 100%;
-      padding: 10px;
-      font-weight: bold;
+      font-size: 20px; /* Slightly larger text */
+      padding: 0;
     }
   </style>
 </head>
@@ -176,32 +174,14 @@
 
       <div class="printer-col-right">
         <button id="tear-paper-btn" class="btn btn-tear-paper">Tear paper</button>
-        <button id="toggle-btn" class="btn btn-show-hide">Hide</button>
       </div>
 
     </div>
   </div>
 
   <script>
-    const toggleBtn = document.getElementById('toggle-btn');
-    const printerGraphic = document.getElementById('printer-graphic');
     const tearPaperBtn = document.getElementById('tear-paper-btn');
     const printedSheet = document.getElementById('printed-sheet');
-
-    // --- SHOW / HIDE LOGIC ---
-    toggleBtn.addEventListener('click', function() {
-      if (printerGraphic.style.visibility === 'hidden') {
-        printerGraphic.style.visibility = 'visible';
-        tearPaperBtn.style.visibility = 'visible'; 
-        toggleBtn.textContent = 'Hide';
-      } else {
-        printerGraphic.style.visibility = 'hidden';
-        tearPaperBtn.style.visibility = 'hidden';
-        toggleBtn.textContent = 'Show Printer';
-        
-        printedSheet.classList.remove('printing');
-      }
-    });
 
     // --- ANIMATION LOGIC ---
     tearPaperBtn.addEventListener('click', function() {
