@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Main Memory Interface</title>
+  
+  <style>
+    /* --- GENERAL LAYOUT --- */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: transparent; 
+      color: #333333; 
+      display: flex;
+      justify-content: center;
+      padding: 10px; 
+      margin: 0;
+      box-sizing: border-box;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden; 
+    }
+
+    /* --- BORDERED OUTER CONTAINER --- */
+    .app-container {
+      width: 100%;
+      height: 100%;
+      border: 2px solid #5a5475; 
+      border-radius: 8px;
+      background-color: #ffffff;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+    }
+
+    /* BUMPED: Main Title */
+    .main-title {
+      font-family: 'Courier New', Courier, monospace;
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-size: 22px; 
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #5a5475;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* --- MEMORY WRAPPER --- */
+    .memory-block {
+      width: 100%;
+      flex-grow: 1; 
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow: hidden; 
+      box-sizing: border-box;
+    }
+
+    .ram-module {
+      width: 100%;
+      height: 100%;
+      display: flex; 
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    /* --- CONTROLS --- */
+    .ram-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 0 5px;
+      flex-shrink: 0;
+    }
+
+    /* BUMPED: Mnemonics Label to 16px to match button */
+    .ram-controls label {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px; /* BUMPED FROM 14px */
+      color: #5a5475;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 10px; /* Slightly wider gap for the bigger checkbox */
+      cursor: pointer;
+    }
+
+    /* Scaled up the physical checkbox square so it doesn't look tiny next to 16px text */
+    .ram-controls input[type="checkbox"] {
+      transform: scale(1.2);
+      cursor: pointer;
+      margin: 0;
+      accent-color: #5a5475;
+    }
+
+    /* BUMPED: Standardized Button Style (Red Theme) */
+    .clear-btn {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #ffffff;
+      color: #c95c5a; 
+      border: 2px solid #c95c5a; 
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+    }
+
+    .clear-btn:hover { background-color: #fff0f0; }
+
+    /* --- ENLARGED MEMORY GRID --- */
+    .ram-grid {
+      display: flex;
+      gap: 15px; 
+      width: 100%;
+      flex-grow: 1; 
+      overflow: hidden; 
+    }
+
+    .ram-column {
+      display: flex;
+      flex-direction: column;
+      flex: 1; 
+      justify-content: space-between; 
+      min-width: 0; 
+    }
+
+    .ram-cell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 32px; 
+    }
+
+    /* BUMPED: Memory Address Labels */
+    .ram-cell label {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px; 
+      font-weight: bold;
+      color: #5a5475;
+      width: 20px; 
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* BUMPED: Data Inputs */
+    .ram-input {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px; 
+      color: #3b7c97; /* Standardized Data Teal */
+      border: 1px solid #b8b4c7;
+      border-radius: 4px;
+      padding: 4px 6px;
+      height: 28px; 
+      flex-grow: 1; 
+      min-width: 0; 
+      margin-left: 8px; 
+      text-align: center;
+      background-color: #f8f8fc;
+      font-weight: bold;
+      letter-spacing: 2px;
+      outline: none;
+      transition: border-color 0.2s, background-color 0.2s;
+      box-sizing: border-box;
+    }
+    
+    .ram-input:focus { border-color: #3b7c97; background-color: #ffffff; }
+
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <h2 class="main-title">Main Memory (RAM)</h2>
+    
+    <div class="memory-block" id="memory-block">
+      <div class="ram-module" id="ram-module">
+        <div class="ram-controls">
+          <label><input type="checkbox" id="mnemonics-cb"> Mnemonics</label>
+          <button class="clear-btn" id="clear-btn">Clear</button>
+        </div>
+        <div class="ram-grid" id="ram-grid"></div>
+      </div>
+    </div>
+    
+  </div>
+
+  <script>
+    const ramGrid = document.getElementById('ram-grid');
+    
+    // Generate the two columns
+    const column1 = document.createElement('div');
+    column1.className = 'ram-column';
+    const column2 = document.createElement('div');
+    column2.className = 'ram-column';
+
+    // Loop to create 32 inputs
+    for (let i = 0; i < 32; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'ram-cell';
+      
+      cell.innerHTML = `
+        <label>${i}</label>
+        <input type="text" value="00000000" maxlength="8" class="ram-input">
+      `;
+      
+      if (i < 16) {
+        column1.appendChild(cell);
+      } else {
+        column2.appendChild(cell);
+      }
+    }
+    
+    ramGrid.appendChild(column1);
+    ramGrid.appendChild(column2);
+
+    // --- CLEAR BUTTON LOGIC ---
+    const clearBtn = document.getElementById('clear-btn');
+    clearBtn.addEventListener('click', function() {
+      const allInputs = document.querySelectorAll('.ram-input');
+      const mnemonicsCb = document.getElementById('mnemonics-cb');
+      
+      allInputs.forEach(input => {
+        input.value = mnemonicsCb.checked ? '' : '00000000';
+      });
+    });
+
+    // --- MNEMONICS CHECKBOX LOGIC ---
+    const mnemonicsCb = document.getElementById('mnemonics-cb');
+    mnemonicsCb.addEventListener('change', function() {
+      const allInputs = document.querySelectorAll('.ram-input');
+      
+      if (this.checked) {
+        allInputs.forEach(input => input.value = '');
+      } else {
+        allInputs.forEach(input => input.value = '00000000');
+      }
+    });
+
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Printer Component</title>
+  
+  <style>
+    /* --- GENERAL LAYOUT --- */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Blueprint Standard */
+      background-color: transparent; 
+      color: #333333; 
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+      margin: 0;
+      box-sizing: border-box;
+      overflow: hidden; 
+      height: 100vh; 
+    }
+
+    /* --- OUTER CONTAINER --- */
+    .printer-container {
+      width: 100%; 
+      height: 100%; 
+      border: 2px solid #5a5475; 
+      border-radius: 8px;
+      background-color: #ffffff; 
+      padding: 20px;
+      display: flex;
+      box-sizing: border-box;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+    }
+
+    /* --- TWO-COLUMN LAYOUT --- */
+    .printer-wrapper {
+      display: flex;
+      justify-content: space-between;
+      align-items: stretch;
+      width: 100%;
+      height: 100%;
+      gap: 30px; 
+    }
+
+    /* Left Column (Title + Printer) */
+    .printer-col-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 220px;
+      gap: 15px; 
+      flex-shrink: 0;
+    }
+
+    /* BUMPED: Title Banner */
+    .title-banner {
+      width: 100%;
+      border: 2px solid #5a5475;
+      background-color: #eef0f5; 
+      color: #5a5475;
+      padding: 8px;
+      text-align: center;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 22px; /* Matched Blueprint */
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      box-sizing: border-box;
+    }
+
+    /* --- PRINTER GRAPHIC --- */
+    .printer-graphic {
+      width: 200px;
+      height: auto;
+      display: block;
+    }
+
+    /* --- ANIMATION STYLES FOR THE PAPER --- */
+    .printed-sheet {
+      transform: translateY(-30px); 
+      transition: transform 1.5s cubic-bezier(0.25, 0.1, 0.25, 1); 
+    }
+
+    .printed-sheet.printing {
+      transform: translateY(0); 
+    }
+
+    /* Right Column (Buttons) */
+    .printer-col-right {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1; 
+      height: 100%;
+    }
+
+    /* BUMPED: Standard Button Styles */
+    .btn {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #ffffff;
+      color: #5a5475;
+      border: 2px solid #5a5475;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 16px; /* Blueprint Base */
+      transition: all 0.2s ease;
+      text-align: center;
+      box-sizing: border-box;
+      font-weight: bold;
+      text-transform: uppercase; /* Standardized */
+      letter-spacing: 1px;
+    }
+
+    .btn:hover:not(:disabled) {
+      background-color: #eef0f5;
+      color: #333333;
+    }
+
+    .btn:disabled {
+      background-color: #f8f8fc;
+      border-color: #b8b4c7;
+      color: #b8b4c7;
+      cursor: not-allowed;
+    }
+
+    /* The large "Tear paper" area fills the whole right side */
+    .btn-tear-paper {
+      width: 100%;
+      height: 100%; 
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 18px; /* Slightly larger text to fill the giant button space, but still obeys blueprint styling */
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="printer-container">
+    <div class="printer-wrapper">
+      
+      <div class="printer-col-left">
+        <div class="title-banner">PRINTER</div>
+        
+        <svg id="printer-graphic" class="printer-graphic" viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="slot-clip">
+              <rect x="0" y="115" width="240" height="50" />
+            </clipPath>
+          </defs>
+
+          <path d="M40 70 L200 70 L210 80 L210 130 Q210 135, 205 135 L35 135 Q30 135, 30 130 L30 80 Z" fill="#333333" stroke="#000000" stroke-width="1.5"/>
+          <rect x="70" y="100" width="100" height="2" fill="#555555" rx="1"/>
+          
+          <path d="M170 70 L200 70 L210 80 L210 100 L170 100 Z" fill="#cccccc" stroke="#000000" stroke-width="1.5"/>
+          <circle cx="180" cy="85" r="4" fill="#333333" stroke="#000000"/>
+          <circle cx="190" cy="85" r="2.5" fill="#f44336" stroke="#000000"/> 
+          <circle cx="190" cy="92" r="2.5" fill="#4CAF50" stroke="#000000"/> 
+          
+          <path d="M60 45 L150 45 L155 70 L55 70 Z" fill="#eef0f5" stroke="#000000" stroke-width="1.5"/>
+          <path d="M80 15 L160 15 L165 60 L75 60 Z" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+
+          <g clip-path="url(#slot-clip)">
+            <g id="printed-sheet" class="printed-sheet">
+              <path d="M60 115 L160 115 L150 145 L70 145 Z" fill="#ffffff" stroke="#000000" stroke-width="1"/>
+              <line x1="75" y1="123" x2="145" y2="123" stroke="#555555" stroke-width="1"/>
+              <line x1="73" y1="128" x2="135" y2="128" stroke="#555555" stroke-width="1"/>
+              <line x1="71" y1="133" x2="140" y2="133" stroke="#555555" stroke-width="1"/>
+              <line x1="69" y1="138" x2="110" y2="138" stroke="#555555" stroke-width="1"/>
+            </g>
+          </g>
+
+          <rect x="50" y="115" width="120" height="15" fill="#dcdcdc" stroke="#000000" stroke-width="1.5" rx="2"/>
+        </svg>
+      </div>
+
+      <div class="printer-col-right">
+        <button id="tear-paper-btn" class="btn btn-tear-paper">TEAR PAPER</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const tearPaperBtn = document.getElementById('tear-paper-btn');
+    const printedSheet = document.getElementById('printed-sheet');
+
+    // --- ANIMATION LOGIC ---
+    tearPaperBtn.addEventListener('click', function() {
+      printedSheet.classList.remove('printing');
+      void printedSheet.offsetWidth; 
+      printedSheet.classList.add('printing');
+
+      const originalText = "TEAR PAPER";
+      tearPaperBtn.textContent = "PRINTING..."; // Capitalized JS update
+      tearPaperBtn.disabled = true; 
+
+      setTimeout(() => {
+        tearPaperBtn.textContent = originalText;
+        tearPaperBtn.disabled = false;
+      }, 1500);
+    });
+  </script>
+
+</body>
+</html>
