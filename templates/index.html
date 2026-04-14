@@ -7,341 +7,133 @@
     <style>
         /* --- MAINFRAME BLUEPRINT THEME --- */
         body {
-            background-color: #f0f0f5;
-            margin: 0;
-            padding: 20px;
+            background-color: #f0f0f5; margin: 0; padding: 0; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            box-sizing: border-box;
-            background-image:
-                linear-gradient(#e2e2ec 1px, transparent 1px),
-                linear-gradient(90deg, #e2e2ec 1px, transparent 1px);
+            display: flex; height: 100vh; width: 100vw;
+            box-sizing: border-box; overflow: hidden;
+            background-image: linear-gradient(#e2e2ec 1px, transparent 1px), linear-gradient(90deg, #e2e2ec 1px, transparent 1px);
             background-size: 20px 20px;
         }
 
         .app-window {
-            width: 1800px; 
-            height: 950px;
-            background-color: #ffffff;
-            border: 2px solid #5a5475; 
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transform-origin: center center;
-            position: relative; 
+            width: 100%; height: 100%; background-color: #ffffff;
+            border: none; border-radius: 0; display: flex; flex-direction: column; position: relative; 
         }
 
         .title-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #f8f8fc;
-            border-bottom: 2px solid #5a5475;
-            padding: 8px 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #f8f8fc; border-bottom: 2px solid #5a5475; padding: 8px 15px;
         }
 
-        .title-text {
-            font-size: 22px;
-            font-weight: bold;
-            color: #333333;
-            letter-spacing: 0.5px;
-        }
+        .title-text { font-size: 22px; font-weight: bold; color: #333333; letter-spacing: 0.5px; }
 
         .title-btn {
-            background: #ffffff;
-            border: 2px solid #b8b4c7;
-            border-radius: 4px;
-            width: 32px;
-            height: 28px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #5a5475;
-            font-weight: bold;
-            cursor: pointer;
+            background: #ffffff; border: 2px solid #b8b4c7; border-radius: 4px; width: 32px; height: 28px; 
+            display: flex; justify-content: center; align-items: center; color: #5a5475; font-weight: bold; cursor: pointer;
         }
 
-        .title-btn-group { 
-            display: flex; 
-            gap: 8px; 
-        }
+        .title-btn-group { display: flex; gap: 8px; }
 
         .dashboard-layout {
-            display: flex;
-            flex-grow: 1;
-            padding: 15px;
-            gap: 15px;
+            display: flex; flex-grow: 1; padding: 10px; gap: 10px; 
             background-color: transparent;
         }
 
         .panel {
-            border: 2px solid #5a5475;
-            border-radius: 6px;
-            background-color: #ffffff;
-            display: block; 
-            position: relative;
-            overflow: hidden; 
+            border: 2px solid #5a5475; border-radius: 6px; background-color: #ffffff;
+            display: flex; flex-direction: column; position: relative; overflow: hidden; 
         }
 
-        /* BROKEN CLIP LOCK SO OUR HUMP HACK CAN STICK OUT */
+        /* ================================================================= */
+        /* MARKER: ADJUST PANEL WIDTHS HERE                                  */
+        /* Change the width numbers below to manually resize the side panels */
+        /* The center panel will automatically grow to eat the remaining space */
+        /* ================================================================= */
+        .panel-left { 
+            width: 340px; 
+            flex-shrink: 0; 
+        }
+        
+        .panel-right { 
+            width: 360px; 
+            flex-shrink: 0; 
+        }
+        
         .panel-center { 
-            width: calc(1800px - 420px - 450px - 60px); 
+            flex-grow: 1; 
             overflow: visible !important; 
         } 
+        /* ================================================================= */
 
         .panel-header {
-            text-align: center;
-            padding: 8px;
-            height: 35px; 
-            border-bottom: 1px solid #5a5475;
-            font-weight: 600;
-            font-size: 14px;
-            color: #333;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            background-color: #fdfdfd;
-            box-sizing: border-box;
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            z-index: 10;
-            border-radius: 4px 4px 0 0;
+            text-align: center; padding: 8px; height: 35px; border-bottom: 1px solid #5a5475;
+            font-weight: 600; font-size: 14px; color: #333; text-transform: uppercase;
+            letter-spacing: 1px; background-color: #fdfdfd; box-sizing: border-box;
+            position: absolute; top: 0; left: 0; right: 0; z-index: 10; border-radius: 4px 4px 0 0;
         }
 
-        .panel-left { width: 420px; flex-shrink: 0; }
-        .panel-right { width: 450px; flex-shrink: 0; }
-
-        /* --- IFRAME CONTAINERS --- */
         .iframe-container {
-            position: absolute;
-            top: 35px; 
-            bottom: 0; 
-            left: 0;
-            right: 0;
-            background-image:
-                linear-gradient(#eef0f5 1px, transparent 1px),
-                linear-gradient(90deg, #eef0f5 1px, transparent 1px);
-            background-size: 15px 15px;
-            overflow: hidden; 
-            box-sizing: border-box;
+            position: absolute; top: 35px; bottom: 0; left: 0; right: 0;
+            background-image: linear-gradient(#eef0f5 1px, transparent 1px), linear-gradient(90deg, #eef0f5 1px, transparent 1px);
+            background-size: 15px 15px; overflow: hidden; box-sizing: border-box;
         }
 
-        .panel-left .iframe-container,
-        .panel-right .iframe-container {
-            display: flex;
-            flex-direction: column;
-            padding: 10px 0;
-        }
+        .panel-left .iframe-container, .panel-right .iframe-container { display: flex; flex-direction: column; padding: 10px 0; }
+        .panel-center .iframe-container { display: flex; flex-direction: column; align-items: center; padding: 10px 10px 0 10px !important; overflow: visible !important; }
 
-        /* CENTER PANEL CONFIGURATION */
-        .panel-center .iframe-container { 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px 10px 0 10px !important; 
-            overflow: visible !important; 
-        }
-
+        /* ALL IFRAMES SETUP FOR JS DYNAMIC SCALING */
         iframe { border: none; background: transparent; }
+        .wrap { display: block; width: 100%; position: relative; margin-bottom: 10px; }
+        
+        /* Forces Left and Right iframes to perfectly center themselves horizontally */
+        .wrap iframe { position: absolute; top: 0; left: 50%; transform-origin: top center; }
 
-        .wrap {
-            display: block;
-            width: 100%;
-            position: relative;
-            margin-bottom: 10px; 
-        }
+        #iframe-hd { width: 480px; }
+        #iframe-ram { width: 530px; }
+        #iframe-screen { width: 420px; }
+        #iframe-printer { width: 730px; }
+        #iframe-lan { width: 1100px; }
+
+        /* --- THE ALIGNMENT FIX: CENTER MODULES MUST ANCHOR TOP-LEFT --- */
+        #iframe-cpu { width: 1200px; height: 760px; left: 0 !important; transform-origin: top left !important; }
+        #iframe-clock { width: 1200px; height: 240px; left: 0 !important; transform-origin: top left !important; }
 
         /* --- LEFT PANEL --- */
-        .wrap-hd { height: 325px; position: relative; flex-shrink: 0; } 
-        .wrap-hd iframe { width: 480px; height: calc(100% / 0.8); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.8); transform-origin: top center; }
-        
-        .wrap-ram { flex-grow: 1; position: relative; margin-bottom: 0; } 
-        .wrap-ram iframe { width: 530px; height: calc(100% / 0.72); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.72); transform-origin: top center; }
+        .wrap-hd { flex-shrink: 0; } 
+        .wrap-ram { flex-grow: 1; margin-bottom: 0; } 
 
         /* --- CENTER PANEL MODULES --- */
-        .cpu-wrap { 
-            width: 850px; 
-            height: calc(850px * (760 / 1200)); 
-            position: relative; 
-            overflow: hidden; 
-            flex-shrink: 0; 
-            margin-bottom: 10px; 
-            z-index: 2;
-        }
-        
-        .cpu-iframe { 
-            width: 1200px; 
-            height: 760px; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            transform: scale(calc(850 / 1200));
-            transform-origin: top left;
-        }
-        
-        .wrap-clock { 
-            width: 850px; 
-            height: calc(850px * (240 / 1200)); 
-            position: relative; 
-            overflow: hidden; 
-            margin: 0 0 10px 0; 
-            padding: 0; 
-            flex-shrink: 0;
-            z-index: 1;
-        }
-        
-        .wrap-clock iframe { 
-            width: 1200px; 
-            height: 240px; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            transform: scale(calc(850 / 1200)); 
-            transform-origin: top left; 
-        }
+        .cpu-wrap { width: 100%; position: relative; overflow: hidden; flex-shrink: 0; margin-bottom: 10px; z-index: 2; }
+        .wrap-clock { width: 100%; position: relative; overflow: hidden; margin: 0 0 10px 0; padding: 0; flex-shrink: 0; z-index: 1; }
 
         /* --- THE HUMP: GROUP INFO CONSOLE --- */
         .info-console-wrap {
-            width: 850px; 
-            flex-grow: 1; 
-            padding: 0; 
-            margin: 0;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            position: relative; 
+            width: 100%; flex-grow: 1; padding: 0; margin: 0; box-sizing: border-box;
+            display: flex; flex-direction: column; position: relative; 
         }
-
-        /* REFINED WHITE BOX HACK (No more broken squiggly corners) */
-        .border-cover-hack {
-            position: absolute;
-            bottom: -2px; 
-            left: 2px; /* Stay inside the vertical border lines */
-            width: calc(100% - 4px); 
-            height: 4px; 
-            background-color: #ffffff;
-            z-index: 100;
-        }
-
+        .border-cover-hack { position: absolute; bottom: -2px; left: 2px; width: calc(100% - 4px); height: 4px; background-color: #ffffff; z-index: 100; }
         .info-console {
-            flex-grow: 1;
-            border: 2px solid #5a5475;
-            background-color: #ffffff;
-            padding: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 13.5px; /* Shrunk font slightly to fit text */
-            color: #5a5475;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-            
-            border-bottom: none !important; 
-            border-radius: 8px 8px 0 0 !important; 
-            margin-bottom: 0 !important;
+            flex-grow: 1; border: 2px solid #5a5475; background-color: #ffffff; padding: 15px; font-family: 'Courier New', Courier, monospace; font-size: 13.5px;
+            color: #5a5475; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); display: flex; flex-direction: column; box-sizing: border-box;
+            border-bottom: none !important; border-radius: 8px 8px 0 0 !important; margin-bottom: 0 !important;
         }
-
-        .info-header {
-            font-weight: bold;
-            text-transform: uppercase;
-            border-bottom: 1px dashed #b8b4c7;
-            padding-bottom: 8px;
-            margin-bottom: 15px;
-            text-align: center;
-            letter-spacing: 1px;
-            color: #3b7c97;
-            font-size: 16px;
-        }
-
-        /* --- HORIZONTAL TEAM ROW STYLING --- */
-        .info-body {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            justify-content: center;
-            align-items: center;
-            flex-grow: 1; 
-            width: 100%;
-        }
-
-        .team-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px; /* Shrunk gap so names don't explode out the sides */
-            width: 100%;
-            white-space: nowrap; 
-        }
-
-        .team-label {
-            font-weight: bold;
-            color: #333333;
-        }
-
-        .team-member {
-            color: #5a5475;
-        }
+        .info-header { font-weight: bold; text-transform: uppercase; border-bottom: 1px dashed #b8b4c7; padding-bottom: 8px; margin-bottom: 15px; text-align: center; letter-spacing: 1px; color: #3b7c97; font-size: 16px; }
+        .info-body { display: flex; flex-direction: column; gap: 12px; justify-content: center; align-items: center; flex-grow: 1; width: 100%; }
+        .team-row { display: flex; justify-content: center; align-items: center; gap: 15px; width: 100%; white-space: nowrap; }
+        .team-label { font-weight: bold; color: #333333; }
+        .team-member { color: #5a5475; }
 
         /* --- RIGHT PANEL --- */
-        .wrap-screen { flex-grow: 1; position: relative; margin-bottom: 15px; min-height: 400px; } 
-        .wrap-screen iframe { width: 420px; height: 100%; position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
-        
-        .wrap-printer { height: 120px; position: relative; flex-shrink: 0; margin-bottom: 15px; } 
-        .wrap-printer iframe { width: 730px; height: calc(100% / 0.55); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.55); transform-origin: top center; }
-        
-        .wrap-lan { height: 210px; position: relative; flex-shrink: 0; margin-bottom: 5px; } 
-        .wrap-lan iframe { width: 1100px; height: calc(100% / 0.4); position: absolute; top: 0; left: 50%; transform: translateX(-50%) scale(0.4); transform-origin: top center; }
+        .wrap-screen { flex-grow: 1; margin-bottom: 15px; min-height: 400px; } 
+        .wrap-printer { flex-shrink: 0; margin-bottom: 15px; } 
+        .wrap-lan { flex-shrink: 0; margin-bottom: 5px; } 
 
         /* --- LOGS MODAL --- */
-        .logs-modal-overlay {
-            position: absolute; 
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: transparent; 
-            backdrop-filter: none;
-            display: none; 
-            pointer-events: none; 
-            z-index: 1000;
-        }
-
-        .logs-modal-content {
-            position: absolute;
-            bottom: 30px; 
-            right: 30px; 
-            width: 550px; 
-            height: 380px;
-            background: transparent;
-            border: none;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.15); 
-            display: flex;
-            flex-direction: column;
-            border-radius: 8px;
-            pointer-events: auto; 
-            animation: slideInCorner 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-        }
-
-        @keyframes slideInCorner {
-            from { transform: translate(50px, 50px) scale(0.9); opacity: 0; }
-            to { transform: translate(0, 0) scale(1); opacity: 1; }
-        }
-
-        .wrap-logs-popup {
-            flex-grow: 1;
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-        
-        .wrap-logs-popup iframe {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 8px; 
-        }
+        .logs-modal-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: transparent; display: none; pointer-events: none; z-index: 1000; }
+        .logs-modal-content { position: absolute; bottom: 30px; right: 30px; width: 550px; height: 380px; background: transparent; border: none; box-shadow: 0 15px 35px rgba(0,0,0,0.15); display: flex; flex-direction: column; border-radius: 8px; pointer-events: auto; animation: slideInCorner 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);  }
+        @keyframes slideInCorner { from { transform: translate(50px, 50px) scale(0.9); opacity: 0; } to { transform: translate(0, 0) scale(1); opacity: 1; } }
+        .wrap-logs-popup { flex-grow: 1; position: relative; width: 100%; height: 100%; }
+        .wrap-logs-popup iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 8px; }
 
     </style>
 </head>
@@ -356,25 +148,24 @@
 
         <div class="dashboard-layout">
             
-            <div class="panel panel-left">
+            <div class="panel panel-left" id="panel-left">
                 <div class="panel-header">PROJECT & DATA MANAGMENT</div>
                 <div class="iframe-container">
-                    <div class="wrap wrap-hd"><iframe src="{{ url_for('static', filename='components/HardDisk.html') }}" scrolling="no"></iframe></div>
-                    <div class="wrap wrap-ram"><iframe src="{{ url_for('static', filename='components/RAM.html') }}" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-hd" id="wrap-hd"><iframe src="{{ url_for('static', filename='components/HardDisk.html') }}" id="iframe-hd" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-ram" id="wrap-ram"><iframe src="{{ url_for('static', filename='components/RAM.html') }}" id="iframe-ram" scrolling="no"></iframe></div>
                 </div>
             </div>
             
-            <div class="panel panel-center">
+            <div class="panel panel-center" id="panel-center">
                 <div class="panel-header">OPERATIONAL CORE SCHEMATIC</div>
-                <div class="iframe-container">
+                <div class="iframe-container" id="center-container">
                     
-                    <div class="cpu-wrap"><iframe src="{{ url_for('static', filename='components/cpu.html') }}" class="cpu-iframe" scrolling="no"></iframe></div>
-                    <div class="wrap-clock"><iframe src="{{ url_for('static', filename='components/clock.html') }}" scrolling="no"></iframe></div>
+                    <div class="cpu-wrap" id="wrap-cpu"><iframe src="{{ url_for('static', filename='components/cpu.html') }}" id="iframe-cpu" scrolling="no"></iframe></div>
+                    <div class="wrap-clock" id="wrap-clock"><iframe src="{{ url_for('static', filename='components/clock.html') }}" id="iframe-clock" scrolling="no"></iframe></div>
                     
                     <div class="info-console-wrap">
-                        <div class="info-console" id="system-info-console">
+                        <div class="info-console">
                             <div class="info-header">Project Group Information</div>
-                            
                             <div class="info-body">
                                 <div class="team-row">
                                     <span class="team-label">TEAM MEMBERS:</span>
@@ -383,7 +174,6 @@
                                     <span class="team-member">• Student Name 3 (ID: XXXXXX)</span>
                                 </div>
                             </div>
-                            
                         </div>
                         <div class="border-cover-hack"></div>
                     </div>
@@ -391,12 +181,12 @@
                 </div>
             </div>
             
-            <div class="panel panel-right">
+            <div class="panel panel-right" id="panel-right">
                 <div class="panel-header">PERIPHERAL MODULES & LOGS</div>
                 <div class="iframe-container">
-                    <div class="wrap wrap-screen"><iframe src="{{ url_for('static', filename='components/screen.html') }}" scrolling="no"></iframe></div>
-                    <div class="wrap wrap-printer"><iframe src="{{ url_for('static', filename='components/printer.html') }}" scrolling="no"></iframe></div>
-                    <div class="wrap wrap-lan"><iframe src="{{ url_for('static', filename='components/lan_network.html') }}" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-screen" id="wrap-screen"><iframe src="{{ url_for('static', filename='components/screen.html') }}" id="iframe-screen" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-printer" id="wrap-printer"><iframe src="{{ url_for('static', filename='components/printer.html') }}" id="iframe-printer" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-lan" id="wrap-lan"><iframe src="{{ url_for('static', filename='components/lan_network.html') }}" id="iframe-lan" scrolling="no"></iframe></div>
                 </div>
             </div>
 
@@ -413,33 +203,65 @@
     </div>
 
     <script>
-        function scaleDashboard() {
-            const appWindow = document.getElementById('app-window');
-            const scale = Math.min((window.innerWidth - 40) / 1800, (window.innerHeight - 40) / 950, 1); 
-            appWindow.style.transform = `scale(${scale})`;
-        }
-        window.addEventListener('resize', scaleDashboard);
-        scaleDashboard();
+        // THE MASTER SCALING ENGINE
+        function scaleAllModules() {
+            // 1. CENTER COMPONENTS (THE FIX: Top-Left anchoring with pure scaling)
+            const centerC = document.getElementById('center-container');
+            if (centerC) {
+                const cScale = (centerC.clientWidth - 20) / 1200; // 20px padding deduction
+                document.getElementById('wrap-cpu').style.height = Math.floor(760 * cScale) + 'px';
+                document.getElementById('iframe-cpu').style.transform = `scale(${cScale})`;
+                document.getElementById('wrap-clock').style.height = Math.floor(240 * cScale) + 'px';
+                document.getElementById('iframe-clock').style.transform = `scale(${cScale})`;
+            }
 
-        function toggleNetworkLogsPopup() {
-            const modal = document.getElementById('logs-modal');
-            if (modal.style.display === 'block') {
-                modal.style.display = 'none';
-            } else {
-                modal.style.display = 'block';
+            // 2. LEFT COMPONENTS
+            const leftC = document.getElementById('panel-left');
+            if (leftC) {
+                const lSafe = leftC.clientWidth - 10;
+                
+                const hdScale = lSafe / 480;
+                document.getElementById('wrap-hd').style.height = Math.floor(412 * hdScale) + 'px';
+                document.getElementById('iframe-hd').style.transform = `translateX(-50%) scale(${hdScale})`;
+                document.getElementById('iframe-hd').style.height = (100 / hdScale) + '%';
+
+                const ramScale = lSafe / 530;
+                document.getElementById('iframe-ram').style.transform = `translateX(-50%) scale(${ramScale})`;
+                document.getElementById('iframe-ram').style.height = (100 / ramScale) + '%';
+            }
+
+            // 3. RIGHT COMPONENTS
+            const rightC = document.getElementById('panel-right');
+            if (rightC) {
+                const rSafe = rightC.clientWidth - 10;
+
+                const scScale = rSafe / 420;
+                document.getElementById('iframe-screen').style.transform = `translateX(-50%) scale(${scScale})`;
+                document.getElementById('iframe-screen').style.height = (100 / scScale) + '%';
+
+                const prScale = rSafe / 730;
+                document.getElementById('wrap-printer').style.height = Math.floor(254 * prScale) + 'px';
+                document.getElementById('iframe-printer').style.transform = `translateX(-50%) scale(${prScale})`;
+                document.getElementById('iframe-printer').style.height = (100 / prScale) + '%';
+
+                const lnScale = rSafe / 1100;
+                document.getElementById('wrap-lan').style.height = Math.floor(575 * lnScale) + 'px';
+                document.getElementById('iframe-lan').style.transform = `translateX(-50%) scale(${lnScale})`;
+                document.getElementById('iframe-lan').style.height = (100 / lnScale) + '%';
             }
         }
 
-        function closeNetworkLogsPopup() {
-            document.getElementById('logs-modal').style.display = 'none';
-        }
+        // Initialize Native Scaling on boot and window resize
+        window.addEventListener('resize', scaleAllModules);
+        scaleAllModules(); 
+        setTimeout(scaleAllModules, 100);
 
-        window.addEventListener('message', function(event) {
-            if (event.data && event.data.action === 'toggleNetworkLogsPopup') {
-                toggleNetworkLogsPopup();
-            } else if (event.data && event.data.action === 'closeNetworkLogsPopup') {
-                closeNetworkLogsPopup();
-            }
+        // Network Logs Logic
+        function toggleNetworkLogsPopup() { const m = document.getElementById('logs-modal'); m.style.display = (m.style.display === 'block') ? 'none' : 'block'; }
+        function closeNetworkLogsPopup() { document.getElementById('logs-modal').style.display = 'none'; }
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.action === 'toggleNetworkLogsPopup') toggleNetworkLogsPopup();
+            else if (e.data && e.data.action === 'closeNetworkLogsPopup') closeNetworkLogsPopup();
         });
     </script>
 </body>

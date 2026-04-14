@@ -24,6 +24,7 @@
             --ic-text: #333333;
             --ic-led: #111111;        
             --ic-pin: #999999;        
+            --ic-car: #4a90e2; /* Specific color for CAR */
         }
 
         /* --- GENERAL PAGE LAYOUT (FIXED FOR IFRAME FIT) --- */
@@ -55,7 +56,7 @@
 
         /* --- SCHEMATIC PANEL (WIDENED TO 1200px) --- */
         .schematic-panel {
-            width: 1200px; /* Expanded from 1000px to fill horizontal space! */
+            width: 1200px; 
             height: 750px;
             background-color: var(--bg-grid-light);
             background-image: 
@@ -220,11 +221,13 @@
         .comp-verdigris { background-color: #8fb67b; border-top: 3px solid #6b8f5a; }
         .comp-sandy { background-color: #cd8955; border-top: 3px solid #a86c40; }
         .comp-peach { background-color: #6d4c41; color: #ffffff; border-top: 3px solid #4a332c; }
+        .comp-car { background-color: var(--ic-car); border-top: 3px solid #2d5a8e; color: white; }
 
-        /* WIDENED COORDINATES */
+        /* COORDINATES - PERFECTLY ALIGNED FOR CLEAN ROUTING */
         #block-pc { top: 220px; left: 160px; }
         #block-ac { top: 320px; left: 890px; }
         #block-ir { top: 480px; left: 890px; }
+        #block-car { top: 500px; left: 500px; width: 140px; height: 65px;} /* Neatly tucked under ALU */
         #block-tbh { top: 500px; left: 130px; width: 80px; height: 45px;}
         #block-mpo { top: 580px; left: 130px; width: 80px; height: 45px;}
 
@@ -349,16 +352,20 @@
             <svg id="wiring-layer">
                 <path id="wire-pc-data" class="wire" data-bus="DATA" d="M 230 220 L 230 87"/>
                 <path id="wire-ac-data" class="wire" data-bus="DATA" d="M 960 320 L 960 87"/>
-                <path id="wire-ir-data" class="wire" data-bus="DATA" d="M 840 87 L 840 510 L 890 510"/>
+                <path id="wire-ir-data" class="wire" data-bus="DATA" d="M 840 87 L 840 512 L 890 512"/>
                 <path id="wire-alu-data" class="wire" data-bus="DATA" d="M 640 380 L 670 380 L 670 87"/>
                 <path id="wire-ac-alu" class="wire" data-bus="DATA" d="M 890 350 L 640 350"/>
 
-                <path id="wire-ir-mpo" class="wire" data-bus="CONTROL" d="M 960 540 L 960 650 L 170 650 L 170 625"/>
+                <path id="wire-ir-car" class="wire" data-bus="CONTROL" d="M 890 532 L 640 532"/>
+                <path id="wire-thb-car" class="wire" data-bus="CONTROL" d="M 210 532 L 500 532"/>
+                <path id="wire-car-alu" class="wire" data-bus="CONTROL" d="M 570 500 L 570 460"/>
+
+                <path id="wire-ir-mpo" class="wire" data-bus="CONTROL" d="M 960 545 L 960 660 L 170 660 L 170 625"/>
                 <path id="wire-thb-mpo" class="wire" data-bus="CONTROL" d="M 170 545 L 170 580"/>
-                <path id="wire-mpo-alu" class="wire" data-bus="CONTROL" d="M 210 602 L 610 602 L 610 440"/>
+                <path id="wire-mpo-alu" class="wire" data-bus="CONTROL" d="M 210 602 L 470 602 L 470 440 L 500 440"/>
 
                 <path id="wire-pc-addr" class="wire" data-bus="TEMPORAL" d="M 300 250 L 390 250 L 390 167"/>
-                <path id="wire-mem-alu-bypass" class="wire" data-bus="TEMPORAL" d="M 410 167 L 410 410 L 515 410"/>
+                <path id="wire-mem-alu-bypass" class="wire" data-bus="TEMPORAL" d="M 410 167 L 410 410 L 500 410"/>
             </svg>
 
             <div class="ic-block comp-verdigris" id="block-pc" onclick="revealComponent('PC')">
@@ -374,6 +381,11 @@
             <div class="ic-block comp-sandy" id="block-ir" onclick="revealComponent('IR')">
                 <div class="ic-reg-val" id="reg-ir"></div>
                 <div class="ic-title">IR: <span id="reg-inst" style="font-weight:800; color:#333;"></span></div>
+            </div>
+
+            <div class="ic-block comp-car" id="block-car" onclick="revealComponent('CAR')">
+                <div class="ic-reg-val" id="reg-car"></div>
+                <div class="ic-title">CAR</div>
             </div>
             
             <div class="ic-block" id="block-alu" onclick="revealComponent('ALU')">
@@ -408,22 +420,14 @@
     </div>
 
 <script>
-    // --- AUTO-SCALING LOGIC (Updated Math for 1200px Width) ---
+    // --- AUTO-SCALING LOGIC ---
     function scaleSchematic() {
         const container = document.getElementById('main-container');
-        
-        // Expanded Width
         const targetWidth = 1230; 
         const targetHeight = 780; 
-
         const availableWidth = window.innerWidth - 20; 
         const availableHeight = window.innerHeight - 20;
-
-        const scaleX = availableWidth / targetWidth;
-        const scaleY = availableHeight / targetHeight;
-        
-        const scale = Math.min(scaleX, scaleY);
-
+        const scale = Math.min(availableWidth / targetWidth, availableHeight / targetHeight);
         container.style.transform = `scale(${scale})`;
     }
 
@@ -431,7 +435,7 @@
     scaleSchematic();
 
     let state = {
-        PC: "", AC: "", IR: "", current_instruction: "", next_instruction: "",
+        PC: "", AC: "", IR: "", CAR: "00000", current_instruction: "", next_instruction: "",
         mode: "IDLE", active_path: [], active_components: [],
         THB: {}, MPO_decision: false, cycles: 0
     };
@@ -445,6 +449,11 @@
             });
             if (response.ok) {
                 const newState = await response.json();
+                // Simulation logic for CAR display based on MSB
+                if (!newState.CAR) {
+                    const isTemporal = newState.mode === "TEMPORAL" || newState.mode === "TEMPORAL BYPASS";
+                    newState.CAR = (isTemporal ? "1" : "0") + "0000"; 
+                }
                 updateVisualization(newState);
             }
         } catch (error) {
@@ -457,11 +466,14 @@
         document.getElementById("reg-pc").innerText = state.PC || "";
         document.getElementById("reg-ac").innerText = state.AC || "";
         document.getElementById("reg-ir").innerText = state.IR || "";
+        document.getElementById("reg-car").innerText = state.CAR || "00000";
         document.getElementById("reg-inst").innerText = state.current_instruction || "";
         document.getElementById("ui-cycles").innerText = state.cycles || "0";
         
         const modeLabel = document.getElementById("ui-mode");
         modeLabel.innerText = state.mode || "IDLE";
+        
+        // Dynamic styling
         if (state.mode === "TEMPORAL" || state.mode === "TEMPORAL BYPASS") {
             modeLabel.style.borderColor = "var(--bus-temporal)";
             modeLabel.style.color = "var(--bus-temporal)";
@@ -488,6 +500,13 @@
                 if(el) el.classList.add('active-comp');
             });
         }
+        
+        // Add CAR to active components if in execution phase
+        if (state.mode !== "IDLE" && state.mode !== "FETCHING") {
+            document.getElementById('block-car').classList.add('active-comp');
+            document.getElementById('wire-car-alu').classList.add('active');
+        }
+
         if (document.getElementById("reveal-panel").style.display === "block") {
             const currentTitle = document.getElementById("reveal-title").innerText.replace(" Inspector", "");
             revealComponent(currentTitle);
@@ -498,7 +517,20 @@
         document.getElementById("reveal-panel").style.display = "block";
         document.getElementById("reveal-title").innerText = `${component} Inspector`;
         let content = "";
-        if (component === "THB") {
+        
+        if (component === "CAR") {
+            const msb = state.CAR ? state.CAR[0] : "0";
+            const source = msb === "1" ? "Temporal History Buffer (THB)" : "System Memory (RAM)";
+            content += `<div style='font-weight:800; margin-bottom:10px;'>Control Status:</div>
+                        <div style='background:#f0f7ff; padding:12px; border-radius:6px; border:1px solid #d0e3ff;'>
+                            <b>MSB:</b> ${msb}<br>
+                            <b>Source:</b> <span style="color:var(--ic-car)">${source}</span>
+                        </div>
+                        <div style='margin-top:10px; font-size:12px; color:var(--text-light);'>
+                            MSB=1 engages temporal bypass for high-speed execution.
+                        </div>`;
+        }
+        else if (component === "THB") {
             content += "<div style='font-weight:800; margin-bottom:10px; color:var(--text-dark);'>History Buffer:</div><table><tr><th>Opcode</th><th>Cycles</th><th>Freq</th></tr>";
             if (state.THB && Object.keys(state.THB).length > 0) {
                 for (const [opcode, data] of Object.entries(state.THB)) {
