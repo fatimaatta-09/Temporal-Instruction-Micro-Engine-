@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network Logs Component</title>
+  
+  <style>
+    /* --- RAW IC HARDWARE AESTHETIC --- */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #ffffff; 
+      border: 2px solid #5a5475; /* Signature blueprint border */
+      border-radius: 8px; /* Smooth IC corners */
+      color: #333333;
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      height: 100vh; /* Fills the exact modal height */
+      box-sizing: border-box;
+      overflow: hidden; /* Banishes scrollbars */
+    }
+
+    /* --- SLEEK IC HEADER --- */
+    .ic-header {
+      background-color: #f8f8fc; /* Slight contrast for header */
+      border-bottom: 2px solid #e2e2ec; 
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ic-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #333333;
+      letter-spacing: 0.5px;
+    }
+
+    /* Circular 'X' close button like the IR Inspector */
+    .ic-close-btn {
+      background: #eef0f5;
+      border: 1px solid #b8b4c7;
+      border-radius: 50%; /* Perfect circle */
+      width: 24px;
+      height: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #5a5475;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .ic-close-btn:hover {
+      background: #c95c5a;
+      color: #ffffff;
+      border-color: #c95c5a;
+    }
+
+    /* --- IC BODY --- */
+    .ic-body {
+      padding: 15px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: #ffffff;
+      overflow: hidden;
+    }
+
+    /* --- LOGS TABLE WRAPPER --- */
+    .logs-wrapper {
+      width: 100%;
+      flex-grow: 1; /* Spring-loads the table to fill all space */
+      border: 1px solid #b8b4c7;
+      border-radius: 4px;
+      overflow-y: auto;
+      background-color: #ffffff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+    }
+
+    th {
+      background-color: #eef0f5;
+      color: #5a5475;
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #b8b4c7;
+      border-right: 1px solid #e2e2ec;
+      position: sticky; 
+      top: 0;
+      font-weight: bold;
+    }
+
+    th:last-child { 
+      border-right: none; 
+    }
+
+    td {
+      padding: 12px 10px;
+      color: #888888;
+      text-align: center;
+      font-style: italic;
+      border-bottom: 1px solid #e2e2ec;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ic-header">
+    <div class="ic-title">Network Logs</div>
+    <button class="ic-close-btn" id="hide-logs-btn">✕</button>
+  </div>
+
+  <div class="ic-body">
+    <div class="logs-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>TIMESTAMP</th>
+            <th>SOURCE</th>
+            <th>DATA PAYLOAD</th>
+            <th>STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="logs-body">
+          <tr>
+            <td colspan="4">Awaiting network activity...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // --- SECURE MODAL CLOSE LOGIC ---
+    // Fires a message to the Mainframe telling it to close the modal
+    document.getElementById('hide-logs-btn').addEventListener('click', function() {
+      if (window.parent) {
+        window.parent.postMessage({ action: 'closeNetworkLogsPopup' }, '*');
+      }
+    });
+  </script>
+
+</body>
+</html>

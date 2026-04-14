@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Bit Operational Core Simulator</title>
+    <style>
+        /* --- MAINFRAME BLUEPRINT THEME --- */
+        body {
+            background-color: #f0f0f5; margin: 0; padding: 0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex; height: 100vh; width: 100vw;
+            box-sizing: border-box; overflow: hidden;
+            background-image: linear-gradient(#e2e2ec 1px, transparent 1px), linear-gradient(90deg, #e2e2ec 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .app-window {
+            width: 100%; height: 100%; background-color: #ffffff;
+            border: none; border-radius: 0; display: flex; flex-direction: column; position: relative; 
+        }
+
+        .title-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #f8f8fc; border-bottom: 2px solid #5a5475; padding: 8px 15px;
+        }
+
+        .title-text { font-size: 22px; font-weight: bold; color: #333333; letter-spacing: 0.5px; }
+
+        .title-btn {
+            background: #ffffff; border: 2px solid #b8b4c7; border-radius: 4px; width: 32px; height: 28px; 
+            display: flex; justify-content: center; align-items: center; color: #5a5475; font-weight: bold; cursor: pointer;
+        }
+
+        .title-btn-group { display: flex; gap: 8px; }
+
+        .dashboard-layout {
+            display: flex; flex-grow: 1; padding: 10px; gap: 10px; 
+            background-color: transparent;
+        }
+
+        .panel {
+            border: 2px solid #5a5475; border-radius: 6px; background-color: #ffffff;
+            display: flex; flex-direction: column; position: relative; overflow: hidden; 
+        }
+
+        /* ================================================================= */
+        /* MARKER: ADJUST PANEL WIDTHS HERE                                  */
+        /* Change the width numbers below to manually resize the side panels */
+        /* The center panel will automatically grow to eat the remaining space */
+        /* ================================================================= */
+        .panel-left { 
+            width: 340px; 
+            flex-shrink: 0; 
+        }
+        
+        .panel-right { 
+            width: 360px; 
+            flex-shrink: 0; 
+        }
+        
+        .panel-center { 
+            flex-grow: 1; 
+            overflow: visible !important; 
+        } 
+        /* ================================================================= */
+
+        .panel-header {
+            text-align: center; padding: 8px; height: 35px; border-bottom: 1px solid #5a5475;
+            font-weight: 600; font-size: 14px; color: #333; text-transform: uppercase;
+            letter-spacing: 1px; background-color: #fdfdfd; box-sizing: border-box;
+            position: absolute; top: 0; left: 0; right: 0; z-index: 10; border-radius: 4px 4px 0 0;
+        }
+
+        .iframe-container {
+            position: absolute; top: 35px; bottom: 0; left: 0; right: 0;
+            background-image: linear-gradient(#eef0f5 1px, transparent 1px), linear-gradient(90deg, #eef0f5 1px, transparent 1px);
+            background-size: 15px 15px; overflow: hidden; box-sizing: border-box;
+        }
+
+        .panel-left .iframe-container, .panel-right .iframe-container { display: flex; flex-direction: column; padding: 10px 0; }
+        .panel-center .iframe-container { display: flex; flex-direction: column; align-items: center; padding: 10px 10px 0 10px !important; overflow: visible !important; }
+
+        /* ALL IFRAMES SETUP FOR JS DYNAMIC SCALING */
+        iframe { border: none; background: transparent; }
+        .wrap { display: block; width: 100%; position: relative; margin-bottom: 10px; }
+        
+        /* Forces Left and Right iframes to perfectly center themselves horizontally */
+        .wrap iframe { position: absolute; top: 0; left: 50%; transform-origin: top center; }
+
+        #iframe-hd { width: 480px; }
+        #iframe-ram { width: 530px; }
+        #iframe-screen { width: 420px; }
+        #iframe-printer { width: 730px; }
+        #iframe-lan { width: 1100px; }
+
+        /* --- THE ALIGNMENT FIX: CENTER MODULES MUST ANCHOR TOP-LEFT --- */
+        #iframe-cpu { width: 1200px; height: 760px; left: 0 !important; transform-origin: top left !important; }
+        #iframe-clock { width: 1200px; height: 240px; left: 0 !important; transform-origin: top left !important; }
+
+        /* --- LEFT PANEL --- */
+        .wrap-hd { flex-shrink: 0; } 
+        .wrap-ram { flex-grow: 1; margin-bottom: 0; } 
+
+        /* --- CENTER PANEL MODULES --- */
+        .cpu-wrap { width: 100%; position: relative; overflow: hidden; flex-shrink: 0; margin-bottom: 10px; z-index: 2; }
+        .wrap-clock { width: 100%; position: relative; overflow: hidden; margin: 0 0 10px 0; padding: 0; flex-shrink: 0; z-index: 1; }
+
+        /* --- THE HUMP: GROUP INFO CONSOLE --- */
+        .info-console-wrap {
+            width: 100%; flex-grow: 1; padding: 0; margin: 0; box-sizing: border-box;
+            display: flex; flex-direction: column; position: relative; 
+        }
+        .border-cover-hack { position: absolute; bottom: -2px; left: 2px; width: calc(100% - 4px); height: 4px; background-color: #ffffff; z-index: 100; }
+        .info-console {
+            flex-grow: 1; border: 2px solid #5a5475; background-color: #ffffff; padding: 15px; font-family: 'Courier New', Courier, monospace; font-size: 13.5px;
+            color: #5a5475; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); display: flex; flex-direction: column; box-sizing: border-box;
+            border-bottom: none !important; border-radius: 8px 8px 0 0 !important; margin-bottom: 0 !important;
+        }
+        .info-header { font-weight: bold; text-transform: uppercase; border-bottom: 1px dashed #b8b4c7; padding-bottom: 8px; margin-bottom: 15px; text-align: center; letter-spacing: 1px; color: #3b7c97; font-size: 16px; }
+        .info-body { display: flex; flex-direction: column; gap: 12px; justify-content: center; align-items: center; flex-grow: 1; width: 100%; }
+        .team-row { display: flex; justify-content: center; align-items: center; gap: 15px; width: 100%; white-space: nowrap; }
+        .team-label { font-weight: bold; color: #333333; }
+        .team-member { color: #5a5475; }
+
+        /* --- RIGHT PANEL --- */
+        .wrap-screen { flex-grow: 1; margin-bottom: 15px; min-height: 400px; } 
+        .wrap-printer { flex-shrink: 0; margin-bottom: 15px; } 
+        .wrap-lan { flex-shrink: 0; margin-bottom: 5px; } 
+
+        /* --- LOGS MODAL --- */
+        .logs-modal-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: transparent; display: none; pointer-events: none; z-index: 1000; }
+        .logs-modal-content { position: absolute; bottom: 30px; right: 30px; width: 550px; height: 380px; background: transparent; border: none; box-shadow: 0 15px 35px rgba(0,0,0,0.15); display: flex; flex-direction: column; border-radius: 8px; pointer-events: auto; animation: slideInCorner 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);  }
+        @keyframes slideInCorner { from { transform: translate(50px, 50px) scale(0.9); opacity: 0; } to { transform: translate(0, 0) scale(1); opacity: 1; } }
+        .wrap-logs-popup { flex-grow: 1; position: relative; width: 100%; height: 100%; }
+        .wrap-logs-popup iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 8px; }
+
+    </style>
+</head>
+<body>
+    <div class="app-window" id="app-window">
+        
+        <div class="title-bar">
+            <div class="title-btn-group"><button class="title-btn">☰</button></div>
+            <div class="title-text">4-BIT OPERATIONAL CORE SIMULATOR (v2.0)</div>
+            <div class="title-btn-group"><button class="title-btn">◀</button><button class="title-btn">⚙</button></div>
+        </div>
+
+        <div class="dashboard-layout">
+            
+            <div class="panel panel-left" id="panel-left">
+                <div class="panel-header">PROJECT & DATA MANAGMENT</div>
+                <div class="iframe-container">
+                    <div class="wrap wrap-hd" id="wrap-hd"><iframe src="{{ url_for('static', filename='components/HardDisk.html') }}" id="iframe-hd" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-ram" id="wrap-ram"><iframe src="{{ url_for('static', filename='components/RAM.html') }}" id="iframe-ram" scrolling="no"></iframe></div>
+                </div>
+            </div>
+            
+            <div class="panel panel-center" id="panel-center">
+                <div class="panel-header">OPERATIONAL CORE SCHEMATIC</div>
+                <div class="iframe-container" id="center-container">
+                    
+                    <div class="cpu-wrap" id="wrap-cpu"><iframe src="{{ url_for('static', filename='components/cpu.html') }}" id="iframe-cpu" scrolling="no"></iframe></div>
+                    <div class="wrap-clock" id="wrap-clock"><iframe src="{{ url_for('static', filename='components/clock.html') }}" id="iframe-clock" scrolling="no"></iframe></div>
+                    
+                    <div class="info-console-wrap">
+                        <div class="info-console">
+                            <div class="info-header">Project Group Information</div>
+                            <div class="info-body">
+                                <div class="team-row">
+                                    <span class="team-label">TEAM MEMBERS:</span>
+                                    <span class="team-member">• Student Name 1 (ID: XXXXXX)</span>
+                                    <span class="team-member">• Student Name 2 (ID: XXXXXX)</span>
+                                    <span class="team-member">• Student Name 3 (ID: XXXXXX)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border-cover-hack"></div>
+                    </div>
+
+                </div>
+            </div>
+            
+            <div class="panel panel-right" id="panel-right">
+                <div class="panel-header">PERIPHERAL MODULES & LOGS</div>
+                <div class="iframe-container">
+                    <div class="wrap wrap-screen" id="wrap-screen"><iframe src="{{ url_for('static', filename='components/screen.html') }}" id="iframe-screen" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-printer" id="wrap-printer"><iframe src="{{ url_for('static', filename='components/printer.html') }}" id="iframe-printer" scrolling="no"></iframe></div>
+                    <div class="wrap wrap-lan" id="wrap-lan"><iframe src="{{ url_for('static', filename='components/lan_network.html') }}" id="iframe-lan" scrolling="no"></iframe></div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="logs-modal-overlay" id="logs-modal" onclick="closeNetworkLogsPopup()">
+            <div class="logs-modal-content" onclick="event.stopPropagation()">
+                <div class="wrap-logs-popup">
+                    <iframe src="{{ url_for('static', filename='components/logs.html') }}" scrolling="no"></iframe>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // THE MASTER SCALING ENGINE
+        function scaleAllModules() {
+            // 1. CENTER COMPONENTS (THE FIX: Top-Left anchoring with pure scaling)
+            const centerC = document.getElementById('center-container');
+            if (centerC) {
+                const cScale = (centerC.clientWidth - 20) / 1200; // 20px padding deduction
+                document.getElementById('wrap-cpu').style.height = Math.floor(760 * cScale) + 'px';
+                document.getElementById('iframe-cpu').style.transform = `scale(${cScale})`;
+                document.getElementById('wrap-clock').style.height = Math.floor(240 * cScale) + 'px';
+                document.getElementById('iframe-clock').style.transform = `scale(${cScale})`;
+            }
+
+            // 2. LEFT COMPONENTS
+            const leftC = document.getElementById('panel-left');
+            if (leftC) {
+                const lSafe = leftC.clientWidth - 10;
+                
+                const hdScale = lSafe / 480;
+                document.getElementById('wrap-hd').style.height = Math.floor(412 * hdScale) + 'px';
+                document.getElementById('iframe-hd').style.transform = `translateX(-50%) scale(${hdScale})`;
+                document.getElementById('iframe-hd').style.height = (100 / hdScale) + '%';
+
+                const ramScale = lSafe / 530;
+                document.getElementById('iframe-ram').style.transform = `translateX(-50%) scale(${ramScale})`;
+                document.getElementById('iframe-ram').style.height = (100 / ramScale) + '%';
+            }
+
+            // 3. RIGHT COMPONENTS
+            const rightC = document.getElementById('panel-right');
+            if (rightC) {
+                const rSafe = rightC.clientWidth - 10;
+
+                const scScale = rSafe / 420;
+                document.getElementById('iframe-screen').style.transform = `translateX(-50%) scale(${scScale})`;
+                document.getElementById('iframe-screen').style.height = (100 / scScale) + '%';
+
+                const prScale = rSafe / 730;
+                document.getElementById('wrap-printer').style.height = Math.floor(254 * prScale) + 'px';
+                document.getElementById('iframe-printer').style.transform = `translateX(-50%) scale(${prScale})`;
+                document.getElementById('iframe-printer').style.height = (100 / prScale) + '%';
+
+                const lnScale = rSafe / 1100;
+                document.getElementById('wrap-lan').style.height = Math.floor(575 * lnScale) + 'px';
+                document.getElementById('iframe-lan').style.transform = `translateX(-50%) scale(${lnScale})`;
+                document.getElementById('iframe-lan').style.height = (100 / lnScale) + '%';
+            }
+        }
+
+        // Initialize Native Scaling on boot and window resize
+        window.addEventListener('resize', scaleAllModules);
+        scaleAllModules(); 
+        setTimeout(scaleAllModules, 100);
+
+        // Network Logs Logic
+        function toggleNetworkLogsPopup() { const m = document.getElementById('logs-modal'); m.style.display = (m.style.display === 'block') ? 'none' : 'block'; }
+        function closeNetworkLogsPopup() { document.getElementById('logs-modal').style.display = 'none'; }
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.action === 'toggleNetworkLogsPopup') toggleNetworkLogsPopup();
+            else if (e.data && e.data.action === 'closeNetworkLogsPopup') closeNetworkLogsPopup();
+        });
+    </script>
+</body>
+</html>

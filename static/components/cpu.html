@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIME CPU Core - Custom Palette Datapath</title>
+    <style>
+        /* --- CUSTOM COLOR PALETTE (UPDATED TO LIGHT BLUEPRINT THEME) --- */
+        :root {
+            --bg-grid-light: #ffffff;
+            --grid-line-1: #e2e2ec;
+            --grid-line-2: #e2e2ec;
+            --panel-border: #5a5475; 
+            --text-dark: #333333;
+            --text-light: #666666;
+            
+            /* Bus Colors */
+            --bus-data: #75b8b6;      
+            --bus-temporal: #d28a5e;  
+            --bus-control: #7db18b;   
+            
+            /* Realistic IC Body Colors */
+            --ic-body: #8fb67b;       
+            --ic-text: #333333;
+            --ic-led: #111111;        
+            --ic-pin: #999999;        
+            --ic-car: #4a90e2; /* Specific color for CAR */
+        }
+
+        /* --- GENERAL PAGE LAYOUT (FIXED FOR IFRAME FIT) --- */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: transparent; 
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; 
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 10px; 
+            box-sizing: border-box;
+            overflow: hidden; 
+        }
+
+        .main-container {
+            background-color: #ffffff;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            border: 2px solid var(--panel-border);
+            display: flex;
+            justify-content: center;
+            transform-origin: top center; 
+            will-change: transform;
+        }
+
+        /* --- SCHEMATIC PANEL (WIDENED TO 1200px) --- */
+        .schematic-panel {
+            width: 1200px; 
+            height: 750px;
+            background-color: var(--bg-grid-light);
+            background-image: 
+                linear-gradient(var(--grid-line-1) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line-1) 1px, transparent 1px),
+                linear-gradient(var(--grid-line-2) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line-2) 1px, transparent 1px);
+            background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+            background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
+            
+            border: 4px solid var(--panel-border);
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.02);
+        }
+
+        /* --- HEADER & CONTROLS --- */
+        .panel-header {
+            text-align: center;
+            padding: 14px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-bottom: 3px solid var(--panel-border);
+            font-weight: 800;
+            color: var(--text-dark);
+            letter-spacing: 1.5px;
+            font-size: 18px;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .mode-indicator {
+            font-size: 12px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 2px solid #e2e8f0;
+            background: #ffffff;
+            color: var(--text-light);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* --- SVG WIRING OVERLAY --- */
+        #wiring-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .wire {
+            fill: none;
+            stroke-width: 6;
+            stroke-linejoin: miter;
+            opacity: 0.4;
+            transition: all 0.3s ease;
+        }
+
+        .wire.active {
+            opacity: 1;
+            stroke-dasharray: 14;
+            animation: flowDash 0.8s linear infinite;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+        }
+
+        @keyframes flowDash { to { stroke-dashoffset: -28; } }
+
+        .wire[data-bus="DATA"] { stroke: var(--bus-data); }
+        .wire[data-bus="CONTROL"] { stroke: var(--bus-control); }
+        .wire[data-bus="TEMPORAL"] { stroke: var(--bus-temporal); stroke-width: 8; }
+
+        /* --- EXTERNAL BUS LINES --- */
+        .bus-label {
+            position: absolute;
+            font-size: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--text-dark);
+            font-weight: 800;
+            z-index: 2;
+            background: rgba(255,255,255,0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+        }
+
+        .bus-static {
+            position: absolute;
+            height: 14px;
+            z-index: 1;
+            opacity: 0.8;
+            transition: all 0.3s;
+        }
+        
+        .bus-static::after { 
+            content: ''; position: absolute; right: -14px; top: -5px;
+            border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 14px solid inherit;
+        }
+
+        .bus-data { top: 80px; left: 40px; right: 100px; background-color: var(--bus-data); border-left-color: var(--bus-data); }
+        .bus-temporal { top: 160px; left: 40px; right: 100px; background-color: var(--bus-temporal); border-left-color: var(--bus-temporal); }
+        
+        .bus-static.active { opacity: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
+
+        /* --- REALISTIC IC COMPONENTS --- */
+        .ic-block {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--ic-body);
+            color: var(--ic-text);
+            font-weight: 700;
+            font-size: 14px;
+            border-radius: 6px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(255,255,255,0.3);
+            width: 140px;
+            height: 65px;
+            z-index: 10;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid #333;
+            border-bottom: 4px solid #333;
+        }
+        
+        .ic-block::before, .ic-block::after {
+            content: ''; position: absolute; left: 10px; right: 10px; height: 8px;
+            background: repeating-linear-gradient(to right, var(--ic-pin), var(--ic-pin) 6px, transparent 6px, transparent 12px);
+            z-index: -1;
+            border-radius: 2px;
+        }
+        .ic-block::before { top: -8px; }
+        .ic-block::after { bottom: -8px; }
+
+        .ic-block:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15), inset 0 2px 4px rgba(255,255,255,0.3);
+        }
+
+        .ic-reg-val {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--ic-led);
+            background: rgba(255,255,255,0.5);
+            padding: 4px 10px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+            border: 1px solid rgba(0,0,0,0.1);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            min-height: 20px;
+        }
+
+        .ic-title { font-size: 11px; letter-spacing: 2px; color: var(--text-dark); text-transform: uppercase; }
+
+        .comp-verdigris { background-color: #8fb67b; border-top: 3px solid #6b8f5a; }
+        .comp-sandy { background-color: #cd8955; border-top: 3px solid #a86c40; }
+        .comp-peach { background-color: #6d4c41; color: #ffffff; border-top: 3px solid #4a332c; }
+        .comp-car { background-color: var(--ic-car); border-top: 3px solid #2d5a8e; color: white; }
+
+        /* COORDINATES - PERFECTLY ALIGNED FOR CLEAN ROUTING */
+        #block-pc { top: 220px; left: 160px; }
+        #block-ac { top: 320px; left: 890px; }
+        #block-ir { top: 480px; left: 890px; }
+        #block-car { top: 500px; left: 500px; width: 140px; height: 65px;} /* Neatly tucked under ALU */
+        #block-tbh { top: 500px; left: 130px; width: 80px; height: 45px;}
+        #block-mpo { top: 580px; left: 130px; width: 80px; height: 45px;}
+
+        #block-alu { 
+            top: 300px; left: 500px; width: 140px; height: 160px; font-size: 26px; 
+            background-color: #f8fcfd;
+            color: #2d4b68;
+            border: 3px solid #2d4b68;
+            border-top: none; border-bottom: none;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+            clip-path: polygon(0 0, 100% 20%, 100% 80%, 0 100%, 0 60%, 25% 50%, 0 40%); 
+            padding-left: 25px;
+            flex-direction: row;
+        }
+        #block-alu::before, #block-alu::after { display: none; }
+
+        .ic-block.active-comp {
+            box-shadow: 0 0 0 4px #3b7c97, 0 10px 20px rgba(0,0,0,0.15);
+            border-top-color: #3b7c97;
+            filter: brightness(1.1);
+        }
+
+        /* --- BOTTOM CONTROLS --- */
+        .simulator-bottom {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 16px 20px;
+            border-top: 2px solid var(--panel-border);
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.02);
+        }
+
+        .btn {
+            background: #f8fafc;
+            border: 2px solid #cbd5e1;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .btn:hover { background: #e2e8f0; border-color: #94a3b8; }
+        .btn-primary { background: #3b7c97; border-color: #3b7c97; color: white; }
+        .btn-primary:hover { background: #2a5a6e; border-color: #2a5a6e; transform: translateY(-1px); }
+
+        /* --- PROFESSIONAL REVEAL MODAL --- */
+        #reveal-panel {
+            position: absolute;
+            top: 75px; right: 25px;
+            width: 340px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid var(--panel-border);
+            border-radius: 12px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+            display: none;
+            z-index: 100;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(30px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        #reveal-header {
+            background: #f8fafc;
+            font-size: 15px; font-weight: 800; 
+            padding: 14px 18px;
+            border-bottom: 2px solid var(--panel-border);
+            display: flex; justify-content: space-between;
+            align-items: center;
+            color: var(--panel-border);
+        }
+        
+        .close-btn { 
+            cursor: pointer; color: #64748b; background: #e2e8f0; 
+            width: 26px; height: 26px; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; transition: 0.2s; font-weight: bold;
+        }
+        .close-btn:hover { background: #c95c5a; color: white; }
+
+        #reveal-content { padding: 18px; font-size: 14px; color: var(--text-dark); line-height: 1.6; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px #e2e8f0; }
+        th, td { border-bottom: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; }
+        th { background: #f8fafc; font-weight: 700; color: var(--text-light); }
+        td { background: #ffffff; font-family: 'Courier New', Courier, monospace; font-weight: 700;}
+
+    </style>
+</head>
+<body>
+
+    <div class="main-container" id="main-container">
+        <div class="schematic-panel">
+            
+            <div class="panel-header">
+                TIME ARCHITECTURE DATAPATH
+                <span class="mode-indicator" id="ui-mode">AWAITING SYSTEM BOOT</span>
+            </div>
+
+            <div class="bus-label" style="top: 55px; left: 525px; color: var(--bus-data);">SYSTEM DATA BUS</div>
+            <div id="bus-data" class="bus-static bus-data"></div>
+
+            <div class="bus-label" style="top: 135px; left: 525px; color: var(--bus-temporal);">SYSTEM ADDRESS / TEMPORAL BUS</div>
+            <div id="bus-temporal" class="bus-static bus-temporal"></div>
+
+            <svg id="wiring-layer">
+                <path id="wire-pc-data" class="wire" data-bus="DATA" d="M 230 220 L 230 87"/>
+                <path id="wire-ac-data" class="wire" data-bus="DATA" d="M 960 320 L 960 87"/>
+                <path id="wire-ir-data" class="wire" data-bus="DATA" d="M 840 87 L 840 512 L 890 512"/>
+                <path id="wire-alu-data" class="wire" data-bus="DATA" d="M 640 380 L 670 380 L 670 87"/>
+                <path id="wire-ac-alu" class="wire" data-bus="DATA" d="M 890 350 L 640 350"/>
+
+                <path id="wire-ir-car" class="wire" data-bus="CONTROL" d="M 890 532 L 640 532"/>
+                <path id="wire-thb-car" class="wire" data-bus="CONTROL" d="M 210 532 L 500 532"/>
+                <path id="wire-car-alu" class="wire" data-bus="CONTROL" d="M 570 500 L 570 460"/>
+
+                <path id="wire-ir-mpo" class="wire" data-bus="CONTROL" d="M 960 545 L 960 660 L 170 660 L 170 625"/>
+                <path id="wire-thb-mpo" class="wire" data-bus="CONTROL" d="M 170 545 L 170 580"/>
+                <path id="wire-mpo-alu" class="wire" data-bus="CONTROL" d="M 210 602 L 470 602 L 470 440 L 500 440"/>
+
+                <path id="wire-pc-addr" class="wire" data-bus="TEMPORAL" d="M 300 250 L 390 250 L 390 167"/>
+                <path id="wire-mem-alu-bypass" class="wire" data-bus="TEMPORAL" d="M 410 167 L 410 410 L 500 410"/>
+            </svg>
+
+            <div class="ic-block comp-verdigris" id="block-pc" onclick="revealComponent('PC')">
+                <div class="ic-reg-val" id="reg-pc"></div>
+                <div class="ic-title">PC</div>
+            </div>
+            
+            <div class="ic-block comp-verdigris" id="block-ac" onclick="revealComponent('AC')">
+                <div class="ic-reg-val" id="reg-ac"></div>
+                <div class="ic-title">AC</div>
+            </div>
+            
+            <div class="ic-block comp-sandy" id="block-ir" onclick="revealComponent('IR')">
+                <div class="ic-reg-val" id="reg-ir"></div>
+                <div class="ic-title">IR: <span id="reg-inst" style="font-weight:800; color:#333;"></span></div>
+            </div>
+
+            <div class="ic-block comp-car" id="block-car" onclick="revealComponent('CAR')">
+                <div class="ic-reg-val" id="reg-car"></div>
+                <div class="ic-title">CAR</div>
+            </div>
+            
+            <div class="ic-block" id="block-alu" onclick="revealComponent('ALU')">
+                ALU
+            </div>
+
+            <div class="ic-block comp-peach" id="block-tbh" onclick="revealComponent('THB')">
+                <div class="ic-title" style="color:#ffffff; font-weight:800; font-size:13px;">THB</div>
+            </div>
+            <div class="ic-block comp-peach" id="block-mpo" onclick="revealComponent('MPO')">
+                <div class="ic-title" style="color:#ffffff; font-weight:800; font-size:13px;">MPO</div>
+            </div>
+
+            <div id="reveal-panel">
+                <div id="reveal-header">
+                    <span id="reveal-title">System Inspector</span>
+                    <div class="close-btn" onclick="closeReveal()">✕</div>
+                </div>
+                <div id="reveal-content"></div>
+            </div>
+
+            <div class="simulator-bottom">
+                <span style="font-family: 'Courier New', monospace; margin-right: 20px; font-weight: 800; color: #333333;">
+                    T-CYCLES: <span id="ui-cycles" style="color: #3b7c97; font-size: 18px;">0</span>
+                </span>
+                <button class="btn btn-primary" onclick="executeStep()">Step Clock</button>
+                <button class="btn" onclick="fetch('/run')">Auto-Run</button>
+                <button class="btn" onclick="fetch('/reset')" style="color: #c95c5a; border-color: #c95c5a;">Reset Core</button>
+            </div>
+
+        </div>
+    </div>
+
+<script>
+    // --- AUTO-SCALING LOGIC ---
+    function scaleSchematic() {
+        const container = document.getElementById('main-container');
+        const targetWidth = 1230; 
+        const targetHeight = 780; 
+        const availableWidth = window.innerWidth - 20; 
+        const availableHeight = window.innerHeight - 20;
+        const scale = Math.min(availableWidth / targetWidth, availableHeight / targetHeight);
+        container.style.transform = `scale(${scale})`;
+    }
+
+    window.addEventListener('resize', scaleSchematic);
+    scaleSchematic();
+
+    let state = {
+        PC: "", AC: "", IR: "", CAR: "00000", current_instruction: "", next_instruction: "",
+        mode: "IDLE", active_path: [], active_components: [],
+        THB: {}, MPO_decision: false, cycles: 0
+    };
+
+    async function executeStep() {
+        try {
+            const response = await fetch('/step', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "step" })
+            });
+            if (response.ok) {
+                const newState = await response.json();
+                // Simulation logic for CAR display based on MSB
+                if (!newState.CAR) {
+                    const isTemporal = newState.mode === "TEMPORAL" || newState.mode === "TEMPORAL BYPASS";
+                    newState.CAR = (isTemporal ? "1" : "0") + "0000"; 
+                }
+                updateVisualization(newState);
+            }
+        } catch (error) {
+            console.error("API Error:", error);
+        }
+    }
+
+    function updateVisualization(newState) {
+        state = newState;
+        document.getElementById("reg-pc").innerText = state.PC || "";
+        document.getElementById("reg-ac").innerText = state.AC || "";
+        document.getElementById("reg-ir").innerText = state.IR || "";
+        document.getElementById("reg-car").innerText = state.CAR || "00000";
+        document.getElementById("reg-inst").innerText = state.current_instruction || "";
+        document.getElementById("ui-cycles").innerText = state.cycles || "0";
+        
+        const modeLabel = document.getElementById("ui-mode");
+        modeLabel.innerText = state.mode || "IDLE";
+        
+        // Dynamic styling
+        if (state.mode === "TEMPORAL" || state.mode === "TEMPORAL BYPASS") {
+            modeLabel.style.borderColor = "var(--bus-temporal)";
+            modeLabel.style.color = "var(--bus-temporal)";
+            modeLabel.style.background = "#fff7ed";
+        } else if (state.mode !== "IDLE") {
+            modeLabel.style.borderColor = "var(--bus-data)";
+            modeLabel.style.color = "var(--bus-data)";
+            modeLabel.style.background = "#ecfdf5"; 
+        }
+
+        document.querySelectorAll('.wire').forEach(w => w.classList.remove('active'));
+        document.querySelectorAll('.bus-static').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.ic-block').forEach(c => c.classList.remove('active-comp'));
+
+        if (state.active_path) {
+            state.active_path.forEach(pathId => {
+                const el = document.getElementById(pathId);
+                if(el) el.classList.add('active');
+            });
+        }
+        if (state.active_components) {
+            state.active_components.forEach(compId => {
+                const el = document.getElementById(compId);
+                if(el) el.classList.add('active-comp');
+            });
+        }
+        
+        // Add CAR to active components if in execution phase
+        if (state.mode !== "IDLE" && state.mode !== "FETCHING") {
+            document.getElementById('block-car').classList.add('active-comp');
+            document.getElementById('wire-car-alu').classList.add('active');
+        }
+
+        if (document.getElementById("reveal-panel").style.display === "block") {
+            const currentTitle = document.getElementById("reveal-title").innerText.replace(" Inspector", "");
+            revealComponent(currentTitle);
+        }
+    }
+
+    function revealComponent(component) {
+        document.getElementById("reveal-panel").style.display = "block";
+        document.getElementById("reveal-title").innerText = `${component} Inspector`;
+        let content = "";
+        
+        if (component === "CAR") {
+            const msb = state.CAR ? state.CAR[0] : "0";
+            const source = msb === "1" ? "Temporal History Buffer (THB)" : "System Memory (RAM)";
+            content += `<div style='font-weight:800; margin-bottom:10px;'>Control Status:</div>
+                        <div style='background:#f0f7ff; padding:12px; border-radius:6px; border:1px solid #d0e3ff;'>
+                            <b>MSB:</b> ${msb}<br>
+                            <b>Source:</b> <span style="color:var(--ic-car)">${source}</span>
+                        </div>
+                        <div style='margin-top:10px; font-size:12px; color:var(--text-light);'>
+                            MSB=1 engages temporal bypass for high-speed execution.
+                        </div>`;
+        }
+        else if (component === "THB") {
+            content += "<div style='font-weight:800; margin-bottom:10px; color:var(--text-dark);'>History Buffer:</div><table><tr><th>Opcode</th><th>Cycles</th><th>Freq</th></tr>";
+            if (state.THB && Object.keys(state.THB).length > 0) {
+                for (const [opcode, data] of Object.entries(state.THB)) {
+                    content += `<tr><td>${opcode}</td><td>${data.cycles}</td><td>${data.count}</td></tr>`;
+                }
+                content += "</table>";
+            } else {
+                content += "</table><p style='color:var(--text-light); margin-top:15px; font-weight:600;'>Buffer is currently empty.</p>";
+            }
+        } 
+        else if (component === "MPO") {
+            let statusColor = state.MPO_decision ? "var(--bus-data)" : "var(--text-light)";
+            content += `<div style="margin-bottom:12px; font-weight:800;">Status: <b style="color:${statusColor}">${state.MPO_decision ? 'BYPASS ENGAGED' : 'SCANNING...'}</b></div><div style="background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:8px; font-family:monospace; font-size:14px;"><div><b>B0:</b> <span style="color:var(--bus-control)">${state.current_instruction || 'WAITING'}</span></div><div style="margin-top:8px;"><b>B1:</b> <span style="color:var(--bus-control)">${state.next_instruction || 'WAITING'}</span></div></div>`;
+        }
+        else if (component === "ALU") {
+            content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Current Operation:</div><div style="font-family:monospace; background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:8px; font-weight:bold; font-size:15px; color:var(--bus-control);">${state.current_instruction || 'IDLE'}</div>`;
+        }
+        else {
+            let val = state[component] || "";
+            content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Register Value:</div><div style="font-family:monospace; font-size:20px; font-weight:bold; background:#f8fafc; padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; color:var(--bus-control); min-height:24px;">${val}</div>`;
+        }
+        document.getElementById("reveal-content").innerHTML = content;
+    }
+
+    function closeReveal() { document.getElementById("reveal-panel").style.display = "none"; }
+</script>
+</body>
+</html>

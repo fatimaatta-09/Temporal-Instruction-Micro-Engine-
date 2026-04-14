@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hard Disk Component</title>
+  
+  <style>
+    /* --- GENERAL LAYOUT --- */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: transparent; 
+      color: #333333; 
+      display: flex;
+      justify-content: center;
+      padding: 10px; 
+      margin: 0;
+      box-sizing: border-box;
+    }
+
+    /* --- HARD DISK CONTAINER --- */
+    .hard-disk-container {
+      width: 100%; 
+      border: 2px solid #5a5475; 
+      border-radius: 8px;
+      background-color: #ffffff; 
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    /* Main Title - Matches Blueprint */
+    .main-title {
+      font-family: 'Courier New', Courier, monospace;
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-size: 22px; 
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #5a5475;
+      text-align: center;
+    }
+
+    /* --- TRACE LOG TABLE STYLES --- */
+    .trace-log-wrapper {
+      width: 100%;
+      margin-bottom: 15px;
+      display: block;
+    }
+
+    /* Sub-headers */
+    .trace-log-wrapper h3, .button-group h4 {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px; /* Scaled down for narrow column */
+      margin: 0 0 10px 0;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+      color: #5a5475;
+    }
+
+    .table-container {
+      height: 180px; 
+      width: 100%; 
+      overflow: auto; 
+      border: 2px solid #b8b4c7; 
+      border-radius: 4px;
+      background-color: #ffffff;
+    }
+
+    .trace-log-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: monospace;
+    }
+
+    /* Table Headers */
+    .trace-log-table th {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #eef0f5; 
+      color: #5a5475;
+      position: sticky;
+      top: 0;
+      padding: 6px 10px;
+      text-align: left;
+      font-weight: bold;
+      font-size: 13px; /* Kept compact for the log */
+      text-transform: uppercase;
+      border-bottom: 2px solid #b8b4c7; 
+      border-right: 1px solid #e2e2ec;
+      letter-spacing: 1px;
+    }
+
+    .trace-log-table th:last-child {
+        border-right: none;
+    }
+
+    /* Table Data Readouts */
+    .trace-log-table td {
+      padding: 6px 10px;
+      border: 1px solid #e2e2ec;
+      font-size: 14px; /* Scaled down for readability */
+      font-weight: bold;
+      color: #3b7c97; /* Standardized Data Teal */
+    }
+
+    .trace-log-table tbody tr:nth-child(even) {
+      background-color: #f8f8fc; 
+    }
+    .trace-log-table tbody tr:nth-child(odd) {
+      background-color: #ffffff;
+    }
+
+    .table-container::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    .table-container::-webkit-scrollbar-track {
+      background: #f0f0f5; 
+      border-left: 1px solid #b8b4c7;
+    }
+    .table-container::-webkit-scrollbar-thumb {
+      background: #b8b4c7; 
+      border-radius: 5px;
+    }
+    .table-container::-webkit-scrollbar-thumb:hover {
+      background: #5a5475; 
+    }
+
+    /* --- CONTROLS & BUTTONS --- */
+    .disk-controls {
+      display: block; 
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .button-grid {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Sleeker Buttons */
+    .btn {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #ffffff;
+      color: #5a5475;
+      border: 2px solid #5a5475; 
+      padding: 8px 16px; /* Reduced chunkiness */
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px; /* Reduced from 16px to fit nicely */
+      font-weight: bold;
+      text-transform: uppercase; 
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background-color: #eef0f5;
+      color: #333333;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hard-disk-container">
+    <h2 class="main-title">Hard Disk</h2>
+
+    <div class="trace-log-wrapper" id="trace-log-wrapper">
+      <h3>Trace Log</h3>
+      <div class="table-container">
+        <table class="trace-log-table">
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Data</th>
+              <th>Hex</th>
+            </tr>
+          </thead>
+          <tbody id="trace-log-body">
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="disk-controls" id="disk-controls">
+      <div class="button-grid">
+        
+        <div class="button-group">
+          <h4>Program</h4>
+          <div class="actions">
+            <button class="btn" id="btn-load">Load</button>
+            <button class="btn">Save</button>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <h4>Data File</h4>
+          <div class="actions">
+            <button class="btn" id="btn-open">Open</button>
+            <button class="btn">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const traceLogBody = document.getElementById('trace-log-body');
+    const btnLoad = document.getElementById('btn-load');
+    const btnOpen = document.getElementById('btn-open');
+
+    // --- CLEAN DATA LOADER (NO PLACEHOLDERS) ---
+    function loadTableData(type) {
+      // Wiped the dummy data insertion
+      traceLogBody.innerHTML = '';
+    }
+
+    btnLoad.addEventListener('click', () => loadTableData('program'));
+    btnOpen.addEventListener('click', () => loadTableData('data'));
+  </script>
+
+</body>
+</html>
