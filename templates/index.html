@@ -94,10 +94,9 @@
         #iframe-printer { width: 730px; }
         #iframe-lan { width: 1100px; }
 
-        /* --- THE ALIGNMENT FIX: CENTER MODULES MUST ANCHOR TOP-LEFT --- */
+       /* --- THE ALIGNMENT FIX: CENTER MODULES MUST ANCHOR TOP-LEFT --- */
         #iframe-cpu { width: 1200px; height: 760px; left: 0 !important; transform-origin: top left !important; }
-        #iframe-clock { width: 1200px; height: 240px; left: 0 !important; transform-origin: top left !important; }
-
+        #iframe-clock { width: 1200px; height: 160px; left: 0 !important; transform-origin: top left !important; }
         /* --- LEFT PANEL --- */
         .wrap-hd { flex-shrink: 0; } 
         .wrap-ram { flex-grow: 1; margin-bottom: 0; } 
@@ -211,7 +210,7 @@
                 const cScale = (centerC.clientWidth - 20) / 1200; // 20px padding deduction
                 document.getElementById('wrap-cpu').style.height = Math.floor(760 * cScale) + 'px';
                 document.getElementById('iframe-cpu').style.transform = `scale(${cScale})`;
-                document.getElementById('wrap-clock').style.height = Math.floor(240 * cScale) + 'px';
+                document.getElementById('wrap-clock').style.height = Math.floor(160 * cScale) + 'px';
                 document.getElementById('iframe-clock').style.transform = `scale(${cScale})`;
             }
 
