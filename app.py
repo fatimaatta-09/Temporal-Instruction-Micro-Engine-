@@ -84,5 +84,5 @@ def reset_core():
 if __name__ == '__main__':
     # THIS IS THE ELECTRON MAGIC:
     # Creates a native desktop window and feeds the Flask app directly into it!
-    window = webview.create_window('TIMM: 4-Bit Operational Core Simulator', app, width=1750, height=980, resizable=False)
+    window = webview.create_window('TIMM: 4-Bit Operational Core Simulator', app, width=1631, height=913, resizable=False)
     webview.start()
