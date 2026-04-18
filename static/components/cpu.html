@@ -6,6 +6,21 @@
     <title>TIME CPU Core - Custom Palette Datapath</title>
     <script src="/static/socket.io.min.js"></script>
     <style>
+        /* Glow effect for physical CPU components (Registers, ALU) */
+        .active-component {
+            box-shadow: 0 0 15px #00ffcc, inset 0 0 10px #00ffcc !important;
+            border-color: #00ffcc !important;
+            background-color: rgba(0, 255, 204, 0.1) !important;
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Glow effect for SVG Wires/Buses */
+        .active-wire {
+            stroke: #00ffcc !important;
+            stroke-width: 4px !important;
+            filter: drop-shadow(0px 0px 5px #00ffcc);
+            transition: all 0.2s ease-in-out;
+        }
         /* --- CUSTOM COLOR PALETTE (UPDATED TO LIGHT BLUEPRINT THEME) --- */
         :root {
             --bg-grid-light: #ffffff;

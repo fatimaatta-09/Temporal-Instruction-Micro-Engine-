@@ -6,7 +6,19 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request
+
+# ==========================================
+# 0. CRITICAL FIX FOR PYINSTALLER --WINDOWED
+# ==========================================
+# Redirect all console prints to a log file so the app doesn't crash in windowed mode.
+log_path = os.path.join(os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else __file__), "timm_system.log")
+log_file = open(log_path, "w", buffering=1)
+sys.stdout = log_file
+sys.stderr = log_file
+
+print("--- TIMM SYSTEM LOG BOOTING ---")
+
+from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO
 import webview
 
@@ -15,8 +27,6 @@ import webview
 # ==========================================
 
 # --- PyInstaller Path Resolution ---
-# If running as a compiled .exe, look in the secret _MEIPASS folder. 
-# Otherwise, run normally.
 if getattr(sys, 'frozen', False):
     template_folder = os.path.join(sys._MEIPASS, 'templates')
     static_folder = os.path.join(sys._MEIPASS, 'static')
@@ -24,48 +34,40 @@ if getattr(sys, 'frozen', False):
 else:
     app = Flask(__name__)
 
+# Reduce Werkzeug logging to prevent overload
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
 
 # ==========================================
 # 2. GLOBAL HARDWARE STATES & BUFFERS
 # ==========================================
 
-# --- Clock & Threads ---
 clock_running = False
 clock_delay = 1.0  
 keep_running = False
 auto_run_thread = None
 
-# --- Main Memory & Hard Disk ---
 main_memory = [0] * 16  
 hard_disk_buffer = {}  
 loaded_file_path = ""
 
-# --- Peripherals (Printer, LAN) ---
 printer_buffer = []
 printer_has_jobs = False
 network_rx_buffer = [] 
 network_logs = []      
 
-# --- CPU Core State ---
 cpu_waiting_for_input = False
 active_in_port = 0  
 accumulator = 0
 
 cpu_state = {
-    "PC": 0,
-    "AC": 0,
-    "IR": 0,
-    "CAR": "00000",
-    "cycles": 0,
-    "mode": "IDLE",
-    "MPO_decision": False,
-    "THB": {},  
-    "is_halted": False,
-    "fgi_flag": False,
-    "input_buffer": 0,
-    "active_path": [],
-    "active_components": []
+    "PC": 0, "AC": 0, "IR": 0, "CAR": "00000", "cycles": 0,
+    "mode": "IDLE", "MPO_decision": False, "THB": {},  
+    "is_halted": False, "fgi_flag": False, "input_buffer": 0,
+    "active_path": [], "active_components": []
 }
 
 # ==========================================
@@ -73,7 +75,6 @@ cpu_state = {
 # ==========================================
 
 def clock_loop():
-    """Background thread that pulses the UI clock."""
     global clock_running, clock_delay, cpu_waiting_for_input
     cycle_count = 0
     while True:
@@ -82,12 +83,10 @@ def clock_loop():
             socketio.emit('tick', {'cycle': cycle_count})
         time.sleep(clock_delay)
 
-# Start the clock thread running in the background immediately
 thread = threading.Thread(target=clock_loop, daemon=True)
 thread.start()
 
 def auto_run_loop():
-    """Background thread that executes the CPU instructions when Auto-Run is active."""
     global keep_running, cpu_state
     while keep_running and not cpu_state["is_halted"]:
         with app.app_context():
@@ -111,22 +110,15 @@ def assemble(text):
         try: return int(text.split(' ')[1], 16) & 0xFF
         except: pass
 
-    impl_map = {
-        "NOP": 0x00, "HLT": 0xF0, "CLR": 0xE0, 
-        "SHL": 0xE1, "SHR": 0xE2, "INP": 0xE3, 
-        "OUT": 0xE4, "ION": 0xE5, "IOF": 0xE6
-    }
+    impl_map = {"NOP": 0x00, "HLT": 0xF0, "CLR": 0xE0, "SHL": 0xE1, "SHR": 0xE2, "INP": 0xE3, "OUT": 0xE4, "ION": 0xE5, "IOF": 0xE6}
     if text in impl_map: return impl_map[text]
     
-    op_map = {
-        "LDA": 1, "STA": 2, "ADD": 3, "SUB": 4, 
-        "MVI": 5, "ADI": 6, "JMP": 7, "JNZ": 8, 
-        "AND": 9, "OR": 0xA, "MOV": 0xB, "INC": 0xC, "DEC": 0xD
-    }
+    op_map = {1: "LDA", 2: "STA", 3: "ADD", 4: "SUB", 5: "MVI", 6: "ADI", 7: "JMP", 8: "JNZ", 9: "AND", 0xA: "OR", 0xB: "MOV", 0xC: "INC", 0xD: "DEC"}
+    reverse_op_map = {v: k for k, v in op_map.items()}
     
     parts = text.split()
-    if len(parts) >= 2 and parts[0] in op_map:
-        opcode = op_map[parts[0]]
+    if len(parts) >= 2 and parts[0] in reverse_op_map:
+        opcode = reverse_op_map[parts[0]]
         operand_str = parts[1]
         if operand_str == "[R2]": operand = 0xF 
         else:
@@ -136,27 +128,17 @@ def assemble(text):
     return 0 
 
 def disassemble(val):
-    impl_map = {
-        0x00: "NOP", 0xF0: "HLT", 0xE0: "CLR", 
-        0xE1: "SHL", 0xE2: "SHR", 0xE3: "INP", 
-        0xE4: "OUT", 0xE5: "ION", 0xE6: "IOF"
-    }
+    impl_map = {0x00: "NOP", 0xF0: "HLT", 0xE0: "CLR", 0xE1: "SHL", 0xE2: "SHR", 0xE3: "INP", 0xE4: "OUT", 0xE5: "ION", 0xE6: "IOF"}
     if val in impl_map: return impl_map[val]
     
     high = (val >> 4) & 0xF 
     low = val & 0xF         
     
-    op_map = {
-        1: "LDA", 2: "STA", 3: "ADD", 4: "SUB", 
-        5: "MVI", 6: "ADI", 7: "JMP", 8: "JNZ", 
-        9: "AND", 0xA: "OR", 0xB: "MOV", 0xC: "INC", 0xD: "DEC"
-    }
-    
+    op_map = {1: "LDA", 2: "STA", 3: "ADD", 4: "SUB", 5: "MVI", 6: "ADI", 7: "JMP", 8: "JNZ", 9: "AND", 0xA: "OR", 0xB: "MOV", 0xC: "INC", 0xD: "DEC"}
     if high in op_map:
         op_name = op_map[high]
         operand_str = "[R2]" if low == 0xF else f"{low:X}"
         return f"{op_name} {operand_str}"
-        
     return f"DATA {val:X}"
 
 def basic_tbt_assembler(filepath):
@@ -170,8 +152,7 @@ def basic_tbt_assembler(filepath):
             line = line.strip()
             if not line: continue
             instruction = line
-            if ',' in instruction:
-                instruction = instruction.split(',')[1].strip()
+            if ',' in instruction: instruction = instruction.split(',')[1].strip()
             if instruction.startswith('ORG'):
                 addr_str = instruction.split()[1]
                 current_address = int(addr_str, 16) if any(c in addr_str for c in 'ABCDEFabcdef') else int(addr_str)
@@ -193,18 +174,11 @@ def format_cpu_response():
     curr_ir = cpu_state["IR"]
     next_ir = main_memory[(cpu_state["PC"] + 1) & 0xF] if not cpu_state["is_halted"] else 0
     return {
-        "PC": f"{cpu_state['PC']:01X}",             
-        "AC": f"{cpu_state['AC']:02X}",             
-        "IR": f"{cpu_state['IR']:02X}",             
-        "CAR": cpu_state["CAR"],                    
-        "cycles": cpu_state["cycles"],
-        "mode": cpu_state["mode"],
-        "current_instruction": disassemble(curr_ir),
-        "next_instruction": disassemble(next_ir),
-        "MPO_decision": cpu_state["MPO_decision"],
-        "THB": cpu_state["THB"],
-        "active_path": cpu_state["active_path"],
-        "active_components": cpu_state["active_components"]
+        "PC": f"{cpu_state['PC']:01X}", "AC": f"{cpu_state['AC']:02X}", "IR": f"{cpu_state['IR']:02X}",             
+        "CAR": cpu_state["CAR"], "cycles": cpu_state["cycles"], "mode": cpu_state["mode"],
+        "current_instruction": disassemble(curr_ir), "next_instruction": disassemble(next_ir),
+        "MPO_decision": cpu_state["MPO_decision"], "THB": cpu_state["THB"],
+        "active_path": cpu_state["active_path"], "active_components": cpu_state["active_components"]
     }
 
 def execute_out_instruction(port, ac_value):
@@ -249,24 +223,20 @@ def step_instruction():
         cpu_state["mode"] = "SYSTEM HALTED"
         return jsonify(format_cpu_response())
 
-    # --- FETCH PHASE ---
     pc_val = cpu_state["PC"]
     ir_val = main_memory[pc_val]
     cpu_state["IR"] = ir_val
     opcode = (ir_val >> 4) & 0xF
     addr = ir_val & 0xF
     actual_addr = addr
-    if addr == 0xF:
-        actual_addr = main_memory[0xF] & 0xF
+    if addr == 0xF: actual_addr = main_memory[0xF] & 0xF
         
-    # --- THB TRACKING ---
     ir_hex = disassemble(ir_val) 
     if ir_hex not in cpu_state["THB"]:
         cpu_state["THB"][ir_hex] = {"count": 0, "cycles": 6}
     cpu_state["THB"][ir_hex]["count"] += 1
     count = cpu_state["THB"][ir_hex]["count"]
     
-    # --- MPO & TEMPORAL BYPASS LOGIC ---
     is_mem_ref = opcode in [1, 2, 3, 4, 9, 0xA]
     cycle_cost = 6 if is_mem_ref else 4 
     cpu_state["MPO_decision"] = False
@@ -281,10 +251,9 @@ def step_instruction():
         cycle_cost = 4 
         car_msb = "1"
         cpu_state["THB"][ir_hex]["cycles"] = 4
-        active_wires.append("wire-mem-alu-bypass")
+        active_wires.extend(["wire-mem-alu-bypass"])
         active_comps.extend(["block-mpo", "block-tbh"])
         
-    # --- EXECUTE PHASE ---
     next_pc = (pc_val + 1) & 0xF
     
     if opcode == 1: 
@@ -336,7 +305,6 @@ def step_instruction():
     elif ir_val == 0xE4: 
         execute_out_instruction(1, cpu_state["AC"]) 
 
-    # --- FINALIZE CYCLE ---
     cpu_state["PC"] = next_pc
     cpu_state["cycles"] += cycle_cost
     final_t_state = 3 if cpu_state["MPO_decision"] else 5
@@ -355,7 +323,7 @@ def step_instruction():
 
 @app.route('/')
 def index():
-    """Serves the main dashboard UI"""
+    print("Serving index.html")
     return render_template('index.html')
 
 @app.route('/run', methods=['GET'])
@@ -386,23 +354,21 @@ def reset_cpu():
 
 @socketio.on('connect')
 def handle_connect():
-    print("Frontend connected!")
+    print("Frontend connected via WebSocket!")
 
-# --- Clock Controls ---
 @socketio.on('set_speed')
 def handle_speed_update(data):
     global clock_delay
     try:
         hz = float(data['speed'])
         if hz > 0: clock_delay = 1.0 / hz
-    except (KeyError, ValueError): pass
+    except: pass
 
 @socketio.on('toggle_clock')
 def handle_toggle(data):
     global clock_running
     clock_running = data.get('running', False)
 
-# --- Memory Updates ---
 def broadcast_memory():
     bin_mem = [f"{v:08b}" for v in main_memory] 
     mnem_mem = [disassemble(v) for v in main_memory] 
@@ -423,23 +389,24 @@ def handle_clear_mem():
     main_memory = [0] * 16
     broadcast_memory()
 
-# --- Hard Disk Controls ---
 @socketio.on('hd_request_file_dialog')
 def handle_file_dialog(data):
     global loaded_file_path
-    root = tk.Tk()
-    root.attributes("-topmost", True) 
-    root.withdraw() 
-    filepath = filedialog.askopenfilename(title="Select File", filetypes=[("TBT Assembly Files", "*.tbt"), ("All Files", "*.*")])
-    root.destroy() 
-    
-    if filepath:
-        loaded_file_path = filepath
-        if basic_tbt_assembler(filepath):
-            table_data = [{'address': f"{addr:01X}", 'data': c['text'], 'hex': c['hex']} for addr, c in hard_disk_buffer.items()]
-            socketio.emit('hd_file_loaded', {'table': table_data, 'filename': os.path.basename(filepath)})
-        else:
-            socketio.emit('hd_error', {'msg': 'Failed to parse the file.'})
+    try:
+        root = tk.Tk()
+        root.attributes("-topmost", True) 
+        root.withdraw() 
+        filepath = filedialog.askopenfilename(title="Select File", filetypes=[("TBT Assembly Files", "*.tbt"), ("All Files", "*.*")])
+        root.destroy() 
+        if filepath:
+            loaded_file_path = filepath
+            if basic_tbt_assembler(filepath):
+                table_data = [{'address': f"{addr:01X}", 'data': c['text'], 'hex': c['hex']} for addr, c in hard_disk_buffer.items()]
+                socketio.emit('hd_file_loaded', {'table': table_data, 'filename': os.path.basename(filepath)})
+            else:
+                socketio.emit('hd_error', {'msg': 'Failed to parse the file.'})
+    except Exception as e:
+        print(f"File Dialog Error: {e}")
 
 @socketio.on('hd_save_to_ram')
 def handle_save_to_ram():
@@ -456,10 +423,7 @@ def handle_edit_file():
     global loaded_file_path
     if loaded_file_path and os.path.exists(loaded_file_path):
         subprocess.Popen(['notepad.exe', loaded_file_path])
-    else:
-        socketio.emit('hd_error', {'msg': 'Please open a file first before editing.'})
 
-# --- Peripherals (Keypad, Printer, LAN) ---
 @socketio.on('keypad_enter_pressed')
 @socketio.on('keyboard_interrupt')
 def handle_keyboard_interrupt(data):
@@ -472,7 +436,7 @@ def handle_keyboard_interrupt(data):
             cpu_state['fgi_flag'] = True
             cpu_waiting_for_input = False 
             socketio.emit('input_accepted')
-        except (ValueError, KeyError): pass
+        except: pass
 
 @socketio.on('request_print_job')
 def handle_print_request():
@@ -488,7 +452,7 @@ def handle_pc_network_traffic(data):
     global cpu_waiting_for_input, active_in_port, accumulator, network_rx_buffer, network_logs
     sender_id = f"PC-{data['sender']}"
     try: payload = int(data['payload']) & 0xFF 
-    except ValueError: payload = 0 
+    except: payload = 0 
     
     timestamp = datetime.now().strftime("%H:%M:%S")
     log_entry = {'time': timestamp, 'source': sender_id, 'payload': payload, 'status': 'Buffered'}
@@ -511,26 +475,23 @@ def fetch_network_logs():
 # ==========================================
 
 def start_socket_server():
-    """Starts the real-time WebSocket server in the background"""
-    socketio.run(app, host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+    try:
+        print("Starting Socket.IO Server...")
+        # FIX: Added allow_unsafe_werkzeug=True to bypass the Flask production block
+        socketio.run(app, host='127.0.0.1', port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    except Exception as e:
+        print(f"SERVER CRASH: {e}")
 
 if __name__ == '__main__':
-    # 1. Boot up the Socket.IO server in a separate background thread
-    server_thread = threading.Thread(target=start_socket_server, daemon=True)
-    server_thread.start()
+    try:
+        server_thread = threading.Thread(target=start_socket_server, daemon=True)
+        server_thread.start()
 
-    # Give the server 1 second to fully boot up before opening the window
-    time.sleep(1)
+        # Give the server 1.5 seconds to fully bind to the port
+        time.sleep(1.5)
 
-    # 2. THIS IS THE ELECTRON MAGIC:
-    # Instead of passing 'app', we point the window to the local Socket.IO server!
-    window = webview.create_window(
-        'TIMM: 4-Bit Operational Core Simulator', 
-        'http://127.0.0.1:5000', 
-        width=1631, 
-        height=913, 
-        resizable=False
-    )
-    
-    # 3. Launch the native desktop application
-    webview.start()
+        print("Launching PyWebView Window...")
+        window = webview.create_window('TIMM: 4-Bit Operational Core Simulator', 'http://127.0.0.1:5000', width=1631, height=913, resizable=False)
+        webview.start() 
+    except Exception as e:
+        print(f"WEBVIEW CRASH: {e}")
