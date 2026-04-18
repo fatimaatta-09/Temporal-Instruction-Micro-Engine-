@@ -50,20 +50,25 @@
         /* Change the width numbers below to manually resize the side panels */
         /* The center panel will automatically grow to eat the remaining space */
         /* ================================================================= */
-        .panel-left { 
+                .panel-left { 
             width: 340px; 
-            flex-shrink: 0; 
+            /* flex: grow shrink basis */
+            flex: 0 0 340px; 
+            max-width: 340px;
+            min-width: 340px;
         }
-        
+
         .panel-right { 
             width: 360px; 
-            flex-shrink: 0; 
+            flex: 0 0 360px; 
+            max-width: 360px;
+            min-width: 360px;
         }
-        
+
         .panel-center { 
-            flex-grow: 1; 
+            flex: 1 1 auto; 
             overflow: visible !important; 
-        } 
+        }
         /* ================================================================= */
 
         .panel-header {
