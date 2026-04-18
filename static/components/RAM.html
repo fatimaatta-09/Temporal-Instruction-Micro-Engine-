@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Main Memory (RAM) Component</title>
   
+  <script src="/static/socket.io.min.js"></script>
+
   <style>
     /* --- GENERAL LAYOUT --- */
     body {
@@ -13,18 +15,18 @@
       color: #333333; 
       display: flex;
       justify-content: center;
-      align-items: stretch; /* Forces the child to stretch vertically */
-      padding: 0; /* Removed padding to let it sit flush if needed */
+      align-items: stretch;
+      padding: 0; 
       margin: 0;
       box-sizing: border-box;
-      height: 100vh; /* Fills the entire frame height */
-      width: 100vw;  /* Fills the entire frame width */
+      height: 100vh; 
+      width: 100vw;  
     }
 
     /* --- RAM CONTAINER --- */
     .ram-container {
       width: 100%; 
-      height: 100%; /* Expands to fill the body */
+      height: 100%; 
       border: 2px solid #5a5475; 
       background-color: #ffffff; 
       padding: 15px;
@@ -46,7 +48,7 @@
       text-align: center;
     }
 
-    /* --- CONTROLS (Mnemonics & Clear) --- */
+    /* --- CONTROLS --- */
     .top-controls {
       display: flex;
       justify-content: space-between;
@@ -99,23 +101,15 @@
       display: flex;
       flex-direction: column;
       gap: 3px;
-      flex-grow: 1; /* This is the magic! It stretches to fill all remaining vertical space */
-      overflow-y: auto; /* Adds a scrollbar ONLY if the screen is too tiny */
+      flex-grow: 1; 
+      overflow-y: auto; 
       padding-right: 5px;
     }
 
     /* Scrollbar */
-    .memory-slots-wrapper::-webkit-scrollbar {
-      width: 8px;
-    }
-    .memory-slots-wrapper::-webkit-scrollbar-track {
-      background: #f0f0f5; 
-      border-radius: 4px;
-    }
-    .memory-slots-wrapper::-webkit-scrollbar-thumb {
-      background: #b8b4c7; 
-      border-radius: 4px;
-    }
+    .memory-slots-wrapper::-webkit-scrollbar { width: 8px; }
+    .memory-slots-wrapper::-webkit-scrollbar-track { background: #f0f0f5; border-radius: 4px; }
+    .memory-slots-wrapper::-webkit-scrollbar-thumb { background: #b8b4c7; border-radius: 4px; }
 
     .memory-row {
       display: flex;
@@ -124,7 +118,7 @@
       background-color: #f8f8fc;
       border: 1px solid #e2e2ec;
       padding: 4px 8px;
-      flex-grow: 1; /* Makes each row stretch slightly to distribute space evenly */
+      flex-grow: 1; 
     }
 
     .memory-address {
@@ -147,14 +141,13 @@
       padding: 4px 8px;
       outline: none;
       transition: border-color 0.2s;
-      width: 100%; /* Force input to take remaining width */
+      width: 100%;
     }
 
     .memory-input:focus {
       border-color: #5a5475;
       background-color: #ffffff;
     }
-
   </style>
 </head>
 <body>
@@ -171,18 +164,22 @@
     </div>
 
     <div class="memory-slots-wrapper" id="memory-wrapper">
-    </div>
+      </div>
 
   </div>
 
   <script>
+    const socket = io();
+    
     const memoryWrapper = document.getElementById('memory-wrapper');
     const chkMnemonics = document.getElementById('chk-mnemonics');
     const btnClear = document.getElementById('btn-clear');
 
-    let cachedMemoryInt = Array(16).fill(0);
-    let cachedMemoryMnemonics = Array(16).fill("0");
+    // Local cached states updated via websockets
+    let cachedMemoryBin = Array(16).fill("00000000");
+    let cachedMemoryMnemonics = Array(16).fill("NOP");
 
+    // 1. Build the 16 slots dynamically
     function buildMemorySlots() {
       for (let i = 0; i < 16; i++) {
         const row = document.createElement('div');
@@ -190,16 +187,18 @@
 
         const label = document.createElement('div');
         label.className = 'memory-address';
-        label.textContent = i;
+        // Display Address as Hex (0-F)
+        label.textContent = i.toString(16).toUpperCase();
 
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'memory-input';
         input.id = `mem-input-${i}`;
-        input.value = "0"; 
+        input.value = "NOP"; 
         
+        // When the user clicks away or hits enter, send to Python
         input.addEventListener('change', (e) => {
-          sendUpdateToBackend(i, e.target.value);
+          socket.emit('update_memory_slot', { address: i, value: e.target.value });
         });
 
         row.appendChild(label);
@@ -208,56 +207,38 @@
       }
     }
 
+    // 2. Refresh visuals based on the checkbox toggle
     function refreshMemoryDisplay() {
       const useMnemonics = chkMnemonics.checked;
       for (let i = 0; i < 16; i++) {
         const input = document.getElementById(`mem-input-${i}`);
         if (useMnemonics) {
-          input.value = cachedMemoryMnemonics[i] === "DATA 0" ? "0" : cachedMemoryMnemonics[i];
+          input.value = cachedMemoryMnemonics[i];
         } else {
-          input.value = cachedMemoryInt[i];
+          input.value = cachedMemoryBin[i]; // Raw 8-bit Binary
         }
       }
     }
 
-    function sendUpdateToBackend(address, value) {
-      fetch('/memory/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: address, value: value })
-      })
-      .then(response => response.json())
-      .then(state => {
-        cachedMemoryInt = state.memory_int;
-        cachedMemoryMnemonics = state.memory_mnemonics;
+    // --- SOCKET LISTENERS ---
+
+    // Ask backend for current memory state on load
+    socket.emit('request_memory_sync');
+
+    socket.on('memory_sync', (state) => {
+        cachedMemoryBin = state.memory_bin;
+        cachedMemoryMnemonics = state.memory_mnem;
         refreshMemoryDisplay();
-      })
-      .catch(err => console.error("Error updating memory:", err));
-    }
+    });
 
     btnClear.addEventListener('click', () => {
-      fetch('/memory/clear', { method: 'POST' })
-      .then(response => response.json())
-      .then(state => {
-        cachedMemoryInt = state.memory_int;
-        cachedMemoryMnemonics = state.memory_mnemonics;
-        refreshMemoryDisplay();
-      })
-      .catch(err => console.error("Error clearing memory:", err));
+      socket.emit('clear_memory');
     });
 
     chkMnemonics.addEventListener('change', refreshMemoryDisplay);
 
-    // Listen to the master clock ticks from the CPU module to auto-update during execution!
-    window.addEventListener('timm-tick', (event) => {
-        const state = event.detail; 
-        cachedMemoryInt = state.memory_int;
-        cachedMemoryMnemonics = state.memory_mnemonics;
-        refreshMemoryDisplay();
-    });
-
+    // Build the grid immediately on page load
     buildMemorySlots();
-    btnClear.click();
 
   </script>
 </body>

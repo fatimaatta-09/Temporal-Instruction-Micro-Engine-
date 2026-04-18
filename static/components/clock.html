@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>System Clock Component</title>
   
+  <script src="/static/socket.io.min.js"></script>
+  
   <style>
     /* --- GENERAL PAGE LAYOUT (STRIPPED PADDING FOR PERFECT ALIGNMENT) --- */
     body {
@@ -338,6 +340,9 @@
   </div>
 
   <script>
+    // NEW: Initialize WebSocket connection to Python backend
+    const socket = io();
+
     // --- Elements ---
     const clockSlider = document.getElementById('clock-slider');
     const clockInput = document.getElementById('clock-input');
@@ -412,6 +417,9 @@
       const val = parseFloat(clockSlider.value);
       clockInput.value = val; 
       update7SegmentDisplay(val); 
+      
+      // NEW: Send the updated speed to Python instantly while dragging the slider
+      socket.emit('set_speed', { speed: val });
     });
 
     clockInput.addEventListener('input', () => {
@@ -426,6 +434,9 @@
         if (sliderVal < 0.2) sliderVal = 0.2;
         if (sliderVal > 50) sliderVal = 50;
         clockSlider.value = sliderVal;
+        
+        // NEW: Send speed to Python while typing
+        socket.emit('set_speed', { speed: sliderVal });
       }
     });
 
@@ -438,6 +449,9 @@
       clockInput.value = val;
       clockSlider.value = val; 
       update7SegmentDisplay(val); 
+
+      // NEW: Send speed to Python when pressing Enter / clicking away
+      socket.emit('set_speed', { speed: val });
     });
 
     // --- Clock Hand Animation Logic ---
@@ -494,8 +508,12 @@
       requestAnimationFrame(animateClockHand);
     }
 
+    // Initialize 
     update7SegmentDisplay(1.0);
     requestAnimationFrame(animateClockHand);
+    
+    // NEW: On page load, sync the default starting speed (1.0 Hz) to the Python backend
+    socket.emit('set_speed', { speed: 1.0 });
 
   </script>
 </body>

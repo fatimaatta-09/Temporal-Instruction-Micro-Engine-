@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dynamic LAN & Network Card</title>
   
+  <script src="/static/socket.io.min.js"></script>
+
   <style>
     /* --- GENERAL PAGE LAYOUT & LIGHT AESTHETIC --- */
     body {
@@ -38,7 +40,6 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.02);
     }
 
-    /* BUMPED: Module Titles to 22px */
     .module-title {
       font-family: 'Courier New', Courier, monospace;
       margin-top: 0;
@@ -51,7 +52,6 @@
       color: #5a5475;
     }
 
-    /* BUMPED: Buttons to 16px */
     .btn-action {
       background-color: #ffffff;
       color: #5a5475;
@@ -86,7 +86,7 @@
       height: 480px; 
     }
 
-    /* --- NEW DATA FLOW WIRE STYLING --- */
+    /* --- DATA FLOW WIRE STYLING --- */
     .network-canvas {
       position: absolute;
       top: 0;
@@ -116,6 +116,11 @@
       z-index: 1; 
       pointer-events: none;
     }
+    
+    /* Alternate color for Broadcasts */
+    .data-flow-broadcast {
+        background-color: #d42df2; 
+    }
 
     /* --- PC NODES --- */
     .pc-node {
@@ -140,7 +145,6 @@
       background: #eef0f5;
     }
 
-    /* BUMPED: PC Labels to 16px */
     .pc-label {
       flex: 1;
       color: #5a5475;
@@ -206,7 +210,6 @@
       background-color: transparent;
     }
 
-    /* BUMPED: Data Input to 24px */
     .data-input {
       background-color: transparent;
       border: none;
@@ -283,12 +286,11 @@
       align-items: center;
       gap: 0; 
       flex-grow: 1;
-      display: none; 
+      display: flex; 
       padding-bottom: 20px;
       margin-top: 10px;
     }
 
-    /* BUMPED: NC Box (Frame Buffer) to 18px */
     .nc-box {
       width: 100%;
       border: 2px solid #5a5475;
@@ -302,6 +304,7 @@
       border-radius: 4px;
       letter-spacing: 1px;
       z-index: 5; 
+      transition: all 0.2s ease;
     }
 
     .nc-internal-wire {
@@ -315,12 +318,23 @@
       border-color: #c4b059; 
       color: #bfa34b;
       background-color: #fffdf5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .buffer-count {
+        background-color: #c4b059;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 14px;
     }
 
     .readout-screen {
       display: flex;
       flex-direction: column;
-      gap: 8px; /* Slightly wider gap for bigger text */
+      gap: 8px; 
       border-color: #e2e2ec;
       background-color: #f8f8fc;
       text-align: left;
@@ -328,7 +342,6 @@
       color: #666666;
     }
 
-    /* BUMPED: Readout Labels to 15px */
     .screen-label {
       text-transform: uppercase;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -337,7 +350,6 @@
       letter-spacing: 1px;
     }
 
-    /* BUMPED: Screen Data Values to 24px */
     .screen-value {
       font-family: monospace;
       font-size: 24px; 
@@ -354,7 +366,6 @@
       flex-grow: 1;
     }
 
-    /* --- LOGS BUTTON AT BOTTOM OF LAN --- */
     .lan-footer {
       width: 100%;
       margin-top: auto; 
@@ -374,6 +385,7 @@
       background-color: #3b7c97;
       color: #ffffff;
     }
+
   </style>
 </head>
 <body>
@@ -382,7 +394,7 @@
     
     <div class="lan-anim-wrapper" id="lan-anim-wrapper">
       <div class="lan-module sim-module" id="lan-module">
-        <h2 class="module-title">LAN</h2>
+        <h2 class="module-title">LAN (Hub Topology)</h2>
 
         <svg class="network-canvas">
           <path d="M 170 240 L 170 300 L 495 300 L 495 240" class="wire" />
@@ -404,7 +416,7 @@
               </svg>
               <div class="screen-content">
                 <div class="input-wrapper">
-                  <input type="text" class="data-input" id="input-0" placeholder=" " maxlength="8">
+                  <input type="number" class="data-input" id="input-0" placeholder=" " min="0" max="255">
                   <span class="cursor-bar">|</span>
                 </div>
               </div>
@@ -433,7 +445,7 @@
               </svg>
               <div class="screen-content">
                 <div class="input-wrapper">
-                  <input type="text" class="data-input" id="input-1" placeholder=" " maxlength="8">
+                  <input type="number" class="data-input" id="input-1" placeholder=" " min="0" max="255">
                   <span class="cursor-bar">|</span>
                 </div>
               </div>
@@ -459,18 +471,21 @@
 
       <div class="nc-contents" id="nc-contents">
         
-        <div class="nc-box frame-buffer">FRAME BUFFER</div>
-        <div class="nc-internal-wire"></div>
-        
-        <div class="nc-box readout-screen">
-          <div class="screen-label">Total PCs on LAN</div>
-          <div class="screen-value" id="total-pcs-screen">2</div>
+        <div class="nc-box frame-buffer">
+            <span>FRAME BUFFER</span>
+            <span class="buffer-count" id="buffer-badge">0</span>
         </div>
         <div class="nc-internal-wire"></div>
         
         <div class="nc-box readout-screen">
-          <div class="screen-label">Transferred Data</div>
+          <div class="screen-label">Latest Data IN</div>
           <div class="screen-value" id="transferred-data-screen">--</div>
+        </div>
+        <div class="nc-internal-wire"></div>
+        
+        <div class="nc-box readout-screen">
+          <div class="screen-label">Latest CPU Broadcast</div>
+          <div class="screen-value" id="broadcast-screen">--</div>
         </div>
 
       </div>
@@ -482,15 +497,20 @@
     </div>
 
   </div> 
-  
+
   <script>
-    // --- Layout & Visibility State Logic ---
+    const socket = io();
+
+    // --- UI Elements ---
     const toggleNcBtn = document.getElementById('toggle-nc-btn');
     const showLogsBtn = document.getElementById('show-logs-btn'); 
     const ncContents = document.getElementById('nc-contents');
+    const bufferBadge = document.getElementById('buffer-badge');
+    const dataScreenIn = document.getElementById('transferred-data-screen');
+    const broadcastScreen = document.getElementById('broadcast-screen');
+    const lanModule = document.getElementById('lan-module');
 
-    ncContents.style.display = 'flex';
-
+    // Show/Hide Network Card
     toggleNcBtn.addEventListener('click', function() {
       if (ncContents.style.display === 'none' || ncContents.style.display === '') {
         ncContents.style.display = 'flex';
@@ -501,15 +521,15 @@
       }
     });
 
-    // --- SECURE BYPASS FOR POPUP MODAL ---
+    // --- SECURE BYPASS FOR EXTERNAL LOGS MODAL ---
     showLogsBtn.addEventListener('click', function() {
       if (window.parent) {
+        // Tells the Mainframe to open logs.html
         window.parent.postMessage({ action: 'toggleNetworkLogsPopup' }, '*');
       }
     });
-
-    // --- Core Data Animation Logic ---
-    const lanModule = document.getElementById('lan-module');
+    
+    // --- ANIMATION ENGINE ---
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     async function animatePacket(packet, path) {
@@ -518,105 +538,111 @@
             const p2 = path[i + 1];
             
             const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-            const duration = dist * 6;
+            const duration = dist * 6; // Speed
 
             const isVertical = Math.abs(p2.y - p1.y) > Math.abs(p2.x - p1.x);
             const rotationAngle = isVertical ? 90 : 0;
 
             const animation = packet.animate([
-                { 
-                    left: p1.x + 'px', 
-                    top: p1.y + 'px',
-                    transform: `translate(-50%, -50%) rotate(${rotationAngle}deg)`
-                },
-                { 
-                    left: p2.x + 'px', 
-                    top: p2.y + 'px',
-                    transform: `translate(-50%, -50%) rotate(${rotationAngle}deg)`
-                }
-            ], {
-                duration: duration,
-                easing: 'linear',
-                fill: 'forwards'
-            });
+                { left: p1.x + 'px', top: p1.y + 'px', transform: `translate(-50%, -50%) rotate(${rotationAngle}deg)` },
+                { left: p2.x + 'px', top: p2.y + 'px', transform: `translate(-50%, -50%) rotate(${rotationAngle}deg)` }
+            ], { duration: duration, easing: 'linear', fill: 'forwards' });
             
             await animation.finished;
         }
     }
 
-    // Main interaction sequence
+    // Path Definitions based on SVG wires
+    const pc0Path = [ {x: 170, y: 240}, {x: 170, y: 300}, {x: 332.5, y: 300}, {x: 332.5, y: 385}, {x: 665, y: 385}, {x: 665, y: 115}, {x: 725, y: 115} ];
+    const pc1Path = [ {x: 495, y: 240}, {x: 495, y: 300}, {x: 332.5, y: 300}, {x: 332.5, y: 385}, {x: 665, y: 385}, {x: 665, y: 115}, {x: 725, y: 115} ];
+
+    // Sequence 1: PC Sends Data TO CPU
     async function executeDataSequence(senderId) {
         const isPc0 = senderId === 0;
-        const mouse0 = document.getElementById('mouse-0');
-        const mouse1 = document.getElementById('mouse-1');
-        const inputElement = isPc0 ? document.getElementById('input-0') : document.getElementById('input-1');
+        const inputElement = document.getElementById(`input-${senderId}`);
+        const dataToSend = inputElement.value;
         
-        if (mouse0.classList.contains('disabled') || mouse1.classList.contains('disabled')) return;
-        
-        const dataToSend = inputElement.value || "[No Data]"; 
+        if (!dataToSend) return; // Don't send empty packets
 
-        // Disable UI during animation
-        mouse0.classList.add('disabled');
-        mouse1.classList.add('disabled');
+        // Send to Python Backend
+        socket.emit('pc_send_data', { sender: senderId, payload: dataToSend });
+        inputElement.value = ''; // clear input
 
-        // Path definitions corresponding exactly to the visual SVG wires
-        const pc0ToPc1 = [ {x: 170, y: 240}, {x: 170, y: 300}, {x: 495, y: 300}, {x: 495, y: 240} ];
-        const pc1ToPc0 = [ {x: 495, y: 240}, {x: 495, y: 300}, {x: 170, y: 300}, {x: 170, y: 240} ];
-        const pc1ToBuffer = [ {x: 495, y: 240}, {x: 495, y: 300}, {x: 332.5, y: 300}, {x: 332.5, y: 385}, {x: 665, y: 385}, {x: 665, y: 115}, {x: 725, y: 115} ];
-        const pc0ToBuffer = [ {x: 170, y: 240}, {x: 170, y: 300}, {x: 332.5, y: 300}, {x: 332.5, y: 385}, {x: 665, y: 385}, {x: 665, y: 115}, {x: 725, y: 115} ];
-
-        const firstLegPath = isPc0 ? pc0ToPc1 : pc1ToPc0;
-        const secondLegPath = isPc0 ? pc1ToBuffer : pc0ToBuffer;
-
+        const sendPath = isPc0 ? pc0Path : pc1Path;
         const packets = [];
         
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 3; i++) {
             const p = document.createElement('div');
             p.className = 'data-flow';
-            p.style.left = firstLegPath[0].x + 'px';
-            p.style.top = firstLegPath[0].y + 'px';
+            p.style.left = sendPath[0].x + 'px';
+            p.style.top = sendPath[0].y + 'px';
             p.style.opacity = '0'; 
-            
-            const startVertical = Math.abs(firstLegPath[1].y - firstLegPath[0].y) > Math.abs(firstLegPath[1].x - firstLegPath[0].x);
-            p.style.transform = `translate(-50%, -50%) rotate(${startVertical ? 90 : 0}deg)`;
-            
             lanModule.appendChild(p);
             packets.push(p);
         }
 
-        const moveFirstLeg = packets.map(async (packet, index) => {
-            await sleep(index * 400); 
+        const moveLeg = packets.map(async (packet, index) => {
+            await sleep(index * 200);
             packet.style.opacity = '1'; 
-            await animatePacket(packet, firstLegPath);
-            packet.style.opacity = '0'; 
-        });
-        await Promise.all(moveFirstLeg);
-
-        await sleep(600);
-
-        const moveSecondLeg = packets.map(async (packet, index) => {
-            await sleep(index * 400);
-            packet.style.opacity = '1'; 
-            await animatePacket(packet, secondLegPath);
-            
-            packet.style.transition = 'opacity 0.3s ease';
+            await animatePacket(packet, sendPath);
             packet.style.opacity = '0';
             setTimeout(() => packet.remove(), 300);
         });
-        await Promise.all(moveSecondLeg);
-
-        // Update the screen data
-        document.getElementById('transferred-data-screen').textContent = dataToSend; 
-
-        // Re-enable UI
-        mouse0.classList.remove('disabled');
-        mouse1.classList.remove('disabled');
     }
 
-    // Attach event listeners
+    // Attach PC Click Events
     document.getElementById('mouse-0').addEventListener('click', () => executeDataSequence(0));
     document.getElementById('mouse-1').addEventListener('click', () => executeDataSequence(1));
-  </script>
 
+    // --- SOCKET LISTENERS ---
+
+    // 1. Update Network Buffer UI (When PC sends data, or CPU reads data)
+    socket.on('update_nc_buffer_ui', (data) => {
+        bufferBadge.innerText = data.count;
+        if(data.last_data !== undefined) {
+            dataScreenIn.innerText = data.last_data;
+            document.getElementById(`input-0`).placeholder = data.last_data;
+            document.getElementById(`input-1`).placeholder = data.last_data;
+        }
+    });
+
+    // 2. CPU triggers OUT 3 (Broadcast)
+    socket.on('network_broadcast_rx', async (data) => {
+        broadcastScreen.innerText = data.payload;
+        
+        // Reverse paths for Broadcast (Buffer TO PCs)
+        const reversePc0 = [...pc0Path].reverse();
+        const reversePc1 = [...pc1Path].reverse();
+
+        const spawnBroadcast = async (path) => {
+            const packets = [];
+            for (let i = 0; i < 3; i++) {
+                const p = document.createElement('div');
+                p.className = 'data-flow data-flow-broadcast'; // Purple packets!
+                p.style.opacity = '0'; 
+                lanModule.appendChild(p);
+                packets.push(p);
+            }
+            packets.map(async (packet, index) => {
+                await sleep(index * 200);
+                packet.style.opacity = '1'; 
+                await animatePacket(packet, path);
+                packet.style.opacity = '0';
+                setTimeout(() => packet.remove(), 300);
+            });
+        };
+
+        // Fire to both PCs simultaneously
+        spawnBroadcast(reversePc0);
+        spawnBroadcast(reversePc1);
+        
+        // Flash screens with the data the CPU just broadcasted
+        setTimeout(() => {
+            document.getElementById(`input-0`).value = data.payload;
+            document.getElementById(`input-1`).value = data.payload;
+        }, 1500);
+    });
+
+  </script>
 </body>
 </html>

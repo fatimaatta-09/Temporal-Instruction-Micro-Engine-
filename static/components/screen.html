@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Display Component</title>
   
+  <script src="/static/socket.io.min.js"></script>
+
   <style>
     /* --- GENERAL LAYOUT --- */
     body {
@@ -15,16 +17,16 @@
       justify-content: center;
       padding: 10px; 
       margin: 0;
-      height: 100vh; /* Locks to the iframe boundary */
+      height: 100vh; 
       box-sizing: border-box;
-      overflow: hidden; /* Banishes scrollbars */
+      overflow: hidden; 
     }
 
     /* --- OUTER CONTAINER (FRAMED) --- */
     .peripheral-container {
       width: 100%;
       height: 100%;
-      border: 2px solid #5a5475; /* Standard module border */
+      border: 2px solid #5a5475; 
       border-radius: 8px;
       background-color: #ffffff; 
       padding: 20px; 
@@ -33,19 +35,36 @@
       gap: 15px; 
       box-sizing: border-box;
       box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+      transition: box-shadow 0.3s ease;
     }
 
-    /* BUMPED: Main Title */
+    /* Glow effect when the CPU pauses and waits for keypad input */
+    .peripheral-container.waiting-for-input {
+      box-shadow: 0 0 20px rgba(210, 138, 94, 0.6);
+      border-color: #d28a5e;
+    }
+
     .main-title {
       font-family: 'Courier New', Courier, monospace;
       margin: 0;
-      font-size: 22px; /* Matched Blueprint */
+      font-size: 22px; 
       font-weight: bold;
       color: #333333;
       text-align: center;
       letter-spacing: 2px;
       text-transform: uppercase;
       flex-shrink: 0; 
+    }
+
+    /* Display Mode Indicator (Shows DEC, HEX, or BIN) */
+    .mode-indicator {
+      position: absolute;
+      top: 25px;
+      left: 30px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      font-weight: bold;
+      color: #75b8b6;
     }
 
     /* --- 7-SEGMENT DISPLAY --- */
@@ -55,6 +74,7 @@
       display: flex;
       justify-content: center;
       flex-shrink: 0;
+      position: relative;
     }
 
     .segmented-display-area {
@@ -71,10 +91,11 @@
       box-shadow: inset 0 1px 4px rgba(0,0,0,0.05);
     }
 
+    /* Adjusted to max-width 11% to fit exactly 8 digits for Binary mode */
     .seg-digit {
       height: 90%; 
       width: auto;
-      max-width: 18%; 
+      max-width: 11%; 
     }
 
     .seg {
@@ -90,7 +111,7 @@
     /* --- KEYPAD --- */
     .keypad-wrapper {
       width: 100%;
-      flex-grow: 1; /* Spring-loads the keypad to fill remaining frame height */
+      flex-grow: 1; 
       display: flex;
       flex-direction: column;
       box-sizing: border-box;
@@ -105,7 +126,6 @@
       height: 100%; 
     }
 
-    /* BUMPED: Standardized Button Style */
     .btn {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
@@ -113,7 +133,7 @@
       border: 2px solid #d28a5e; 
       cursor: pointer;
       border-radius: 6px;
-      font-size: 20px; /* Perfect size for digit buttons */
+      font-size: 20px; 
       font-weight: bold;
       transition: all 0.2s ease;
       display: flex;
@@ -125,27 +145,35 @@
       text-transform: uppercase;
     }
 
-    .btn:hover:not(.btn-blank) {
+    .btn:hover {
       background-color: #fff3e0;
       color: #d28a5e;
     }
 
-    /* BUMPED: Action Text Buttons (Clear, Enter) */
     .btn-text {
-      font-size: 16px; /* Matched Blueprint */
+      font-size: 16px; 
       letter-spacing: 1px;
     }
 
-    .btn-blank {
-      border: 2px solid #e2e2ec;
-      background-color: transparent;
-      cursor: default;
-      box-shadow: none;
+    /* Replaced blank with Mode button styling */
+    .btn-mode {
+      border: 2px solid #75b8b6;
+      color: #75b8b6;
+    }
+    .btn-mode:hover {
+      background-color: #e0f2f1;
+      color: #00897b;
     }
 
     .btn-enter {
       grid-column: 4;
       grid-row: span 2; 
+      background-color: #d28a5e;
+      color: white;
+    }
+    .btn-enter:hover {
+      background-color: #b8734b;
+      color: white;
     }
 
     .btn-zero {
@@ -155,137 +183,187 @@
 </head>
 <body>
 
-  <div class="peripheral-container">
+  <div class="peripheral-container" id="peripheral-container">
     <h2 class="main-title">DISPLAY</h2>
-
+    
     <div class="display-wrapper" id="display-wrapper">
-      <div class="segmented-display-area">
-        
-        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-1">
-          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
-          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
-          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
-          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
-          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
-          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
-          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
-        </svg>
-
-        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-2">
-          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
-          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
-          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
-          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
-          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
-          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
-          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
-        </svg>
-
-        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-3">
-          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
-          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
-          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
-          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
-          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
-          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
-          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
-        </svg>
-
-        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-4">
-          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
-          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
-          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
-          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
-          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
-          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
-          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
-        </svg>
-
-        <svg class="seg-digit" viewBox="0 0 60 100" id="digit-5">
-          <polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" />
-          <polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" />
-          <polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" />
-          <polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" />
-          <polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" />
-          <polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" />
-          <polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" />
-        </svg>
-
+      <div class="mode-indicator" id="mode-text">DEC</div>
+      <div class="segmented-display-area" id="seg-area">
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
+        <svg class="seg-digit" viewBox="0 0 60 100"><polygon class="seg a" points="10,10 15,5 45,5 50,10 45,15 15,15" /><polygon class="seg b" points="50,10 55,15 55,45 50,50 45,45 45,15" /><polygon class="seg c" points="50,50 55,55 55,85 50,90 45,85 45,55" /><polygon class="seg d" points="10,90 15,95 45,95 50,90 45,85 15,85" /><polygon class="seg e" points="10,50 5,55 5,85 10,90 15,85 15,55" /><polygon class="seg f" points="10,10 5,15 5,45 10,50 15,45 15,15" /><polygon class="seg g" points="10,50 15,45 45,45 50,50 45,55 15,55" /></svg>
       </div>
     </div>
     
     <div class="keypad-wrapper" id="keypad-wrapper">
       <div class="keypad-grid">
-        
-        <button class="btn">7</button>
-        <button class="btn">8</button>
-        <button class="btn">9</button>
-        <button class="btn btn-text">CLEAR</button>
+        <button class="btn num-btn" data-val="7">7</button>
+        <button class="btn num-btn" data-val="8">8</button>
+        <button class="btn num-btn" data-val="9">9</button>
+        <button class="btn btn-text" id="btn-clear">CLEAR</button>
 
-        <button class="btn">4</button>
-        <button class="btn">5</button>
-        <button class="btn">6</button>
-        <div class="btn btn-blank"></div>
+        <button class="btn num-btn" data-val="4">4</button>
+        <button class="btn num-btn" data-val="5">5</button>
+        <button class="btn num-btn" data-val="6">6</button>
+        <button class="btn btn-mode btn-text" id="btn-mode">MODE</button>
 
-        <button class="btn">1</button>
-        <button class="btn">2</button>
-        <button class="btn">3</button>
-        <button class="btn btn-enter btn-text">ENTER</button>
+        <button class="btn num-btn" data-val="1">1</button>
+        <button class="btn num-btn" data-val="2">2</button>
+        <button class="btn num-btn" data-val="3">3</button>
+        <button class="btn btn-enter btn-text" id="btn-enter">ENTER</button>
 
-        <button class="btn btn-zero">0</button>
-        <button class="btn">.</button>
-
+        <button class="btn btn-zero num-btn" data-val="0">0</button>
+        <button class="btn" id="btn-dot">.</button>
       </div>
     </div>
 
   </div>
 
   <script>
+    const socket = io();
 
-    const toggleDisplayBtn = document.getElementById('toggle-display-btn');
-    const toggleKeypadBtn = document.getElementById('toggle-keypad-btn');
-    
-    const displayWrapper = document.getElementById('display-wrapper');
-    const displaySeparator = document.getElementById('display-separator');
-    const keypadWrapper = document.getElementById('keypad-wrapper');
+    // --- State Variables ---
+    let accumulatorValue = 0; // The true value stored in the CPU
+    let inputBuffer = "";     // What the user is currently typing
+    let isWaitingForInput = false; 
+    let displayMode = 'DEC';  // Modes: 'DEC', 'HEX', 'BIN'
 
-    // Helper to check if both are visible to show/hide the separator line
-    function updateSeparator() {
-      if (displayWrapper && keypadWrapper && displaySeparator) {
-        if (displayWrapper.style.display === 'block' && keypadWrapper.style.display === 'block') {
-          displaySeparator.style.display = 'block';
-        } else {
-          displaySeparator.style.display = 'none';
-        }
+    // --- HTML Elements ---
+    const modeText = document.getElementById('mode-text');
+    const container = document.getElementById('peripheral-container');
+    const digitSVGs = document.querySelectorAll('.seg-digit');
+    const numBtns = document.querySelectorAll('.num-btn');
+    const btnClear = document.getElementById('btn-clear');
+    const btnEnter = document.getElementById('btn-enter');
+    const btnMode = document.getElementById('btn-mode');
+
+    // Maps character to 7-segment SVG lines
+    const segMap = {
+      '0': ['.a','.b','.c','.d','.e','.f'],
+      '1': ['.b','.c'],
+      '2': ['.a','.b','.g','.e','.d'],
+      '3': ['.a','.b','.g','.c','.d'],
+      '4': ['.f','.g','.b','.c'],
+      '5': ['.a','.f','.g','.c','.d'],
+      '6': ['.a','.f','.g','.e','.c','.d'],
+      '7': ['.a','.b','.c'],
+      '8': ['.a','.b','.c','.d','.e','.f','.g'],
+      '9': ['.a','.b','.c','.d','.f','.g'],
+      'A': ['.a','.b','.c','.e','.f','.g'],
+      'B': ['.c','.d','.e','.f','.g'], 
+      'C': ['.a','.d','.e','.f'],
+      'D': ['.b','.c','.d','.e','.g'], 
+      'E': ['.a','.d','.e','.f','.g'],
+      'F': ['.a','.e','.f','.g'],
+      ' ': [] // blank
+    };
+
+    // --- RENDER LOGIC ---
+    function renderDisplay() {
+      // Decide which value to show: The typing buffer (if active) OR the CPU Accumulator
+      let valToFormat = isWaitingForInput && inputBuffer !== "" ? parseInt(inputBuffer, 10) : accumulatorValue;
+      if (isNaN(valToFormat)) valToFormat = 0;
+
+      let str = "";
+      if (displayMode === 'DEC') {
+        str = valToFormat.toString(10).padStart(8, ' ');
+      } else if (displayMode === 'HEX') {
+        str = valToFormat.toString(16).toUpperCase().padStart(8, ' ');
+      } else if (displayMode === 'BIN') {
+        str = valToFormat.toString(2).padStart(8, '0');
+      }
+
+      // Apply to SVGs
+      for (let i = 0; i < 8; i++) {
+        let char = str[i] || ' ';
+        let svg = digitSVGs[i];
+        
+        // Turn off all segments first
+        svg.querySelectorAll('.seg').forEach(el => el.classList.remove('on'));
+        
+        // Turn on required segments
+        const segmentsToTurnOn = segMap[char] || [];
+        segmentsToTurnOn.forEach(selector => {
+          let seg = svg.querySelector(selector);
+          if(seg) seg.classList.add('on');
+        });
       }
     }
 
-    if (toggleDisplayBtn) {
-      toggleDisplayBtn.addEventListener('click', function() {
-        if (displayWrapper.style.display === 'none' || displayWrapper.style.display === '') {
-          displayWrapper.style.display = 'block';
-          toggleDisplayBtn.textContent = 'Hide Display';
-        } else {
-          displayWrapper.style.display = 'none';
-          toggleDisplayBtn.textContent = 'Show Display';
-        }
-        updateSeparator();
-      });
-    }
+    // --- BUTTON LOGIC ---
 
-    if (toggleKeypadBtn) {
-      toggleKeypadBtn.addEventListener('click', function() {
-        if (keypadWrapper.style.display === 'none' || keypadWrapper.style.display === '') {
-          keypadWrapper.style.display = 'block';
-          toggleKeypadBtn.textContent = 'Hide Keypad';
-        } else {
-          keypadWrapper.style.display = 'none';
-          toggleKeypadBtn.textContent = 'Show Keypad';
+    // 1. Number Buttons (Typing)
+    numBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!isWaitingForInput) return; // Only allow typing when CPU says IN
+        
+        let digit = btn.getAttribute('data-val');
+        inputBuffer += digit;
+        
+        // Keep it to 8-bit limits (max 255)
+        if (parseInt(inputBuffer, 10) > 255) {
+            inputBuffer = "255"; 
         }
-        updateSeparator();
+        renderDisplay();
       });
-    }
+    });
+
+    // 2. CLEAR Button
+    btnClear.addEventListener('click', () => {
+      inputBuffer = "";
+      renderDisplay();
+    });
+
+    // 3. ENTER Button (Send to CPU)
+    btnEnter.addEventListener('click', () => {
+      if (isWaitingForInput && inputBuffer !== "") {
+        let finalVal = parseInt(inputBuffer, 10);
+        socket.emit('keypad_enter_pressed', { value: finalVal });
+      }
+    });
+
+    // 4. MODE Button (Cycle DEC -> HEX -> BIN)
+    btnMode.addEventListener('click', () => {
+      if (displayMode === 'DEC') displayMode = 'HEX';
+      else if (displayMode === 'HEX') displayMode = 'BIN';
+      else displayMode = 'DEC';
+      
+      modeText.innerText = displayMode;
+      renderDisplay();
+    });
+
+    // --- WEBSOCKET LISTENERS ---
+
+    // 1. CPU triggers an OUT instruction
+    socket.on('display_update', (data) => {
+      accumulatorValue = data.value;
+      renderDisplay();
+    });
+
+    // 2. CPU triggers an IN instruction (Halts and waits)
+    socket.on('request_input', () => {
+      isWaitingForInput = true;
+      inputBuffer = ""; // Reset buffer
+      container.classList.add('waiting-for-input'); // Make it glow!
+      renderDisplay(); // Will blank out slightly if buffer is empty
+    });
+
+    // 3. CPU accepts the input and resumes clock
+    socket.on('input_accepted', () => {
+      isWaitingForInput = false;
+      inputBuffer = "";
+      container.classList.remove('waiting-for-input'); // Remove glow
+      // We don't render display here yet; we wait for the CPU to specifically call OUT if it wants to show the new value.
+    });
+
+    // Initial render
+    renderDisplay();
+
   </script>
-
 </body>
 </html>
