@@ -423,13 +423,31 @@
                 <div id="reveal-content"></div>
             </div>
 
+            <!-- FIX: Temporal Mode Popup Banner -->
+            <div id="temporal-banner" style="display:none; position:absolute; top:60px; left:50%; transform:translateX(-50%);
+                background:#fff7ed; border:2px solid #d28a5e; border-radius:8px; padding:8px 20px; z-index:200;
+                font-family:'Courier New',monospace; font-size:13px; color:#d28a5e; font-weight:bold; white-space:nowrap;
+                box-shadow:0 4px 12px rgba(210,138,94,0.3);">
+                ⚡ TEMPORAL BYPASS ACTIVE — <span id="temporal-instruction-label"></span> routed via THB (4 cycles)
+                <span onclick="document.getElementById('temporal-banner').style.display='none'"
+                      style="margin-left:12px; cursor:pointer; color:#b8734b;">✕</span>
+            </div>
+
             <div class="simulator-bottom">
-                <span style="font-family: 'Courier New', monospace; margin-right: 20px; font-weight: 800; color: #333333;">
+                <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
                     T-CYCLES: <span id="ui-cycles" style="color: #3b7c97; font-size: 18px;">0</span>
                 </span>
-                <button class="btn btn-primary" onclick="executeStep()">Step Clock</button>
-                <button class="btn" onclick="fetch('/run')">Auto-Run</button>
-                <button class="btn" onclick="fetch('/reset')" style="color: #c95c5a; border-color: #c95c5a;">Reset Core</button>
+                <!-- FIX: Clock cycles per instruction display -->
+                <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
+                    LAST COST: <span id="ui-clk-cost" style="color: #d28a5e; font-size: 18px;">—</span>
+                </span>
+                <button class="btn btn-primary" id="btn-step" onclick="executeStep()">Step Clock</button>
+                <button class="btn" id="btn-run" onclick="startAutoRun()">Auto-Run</button>
+                <!-- FIX: Stop button -->
+                <button class="btn" id="btn-stop" onclick="stopAutoRun()" style="display:none; color:#c95c5a; border-color:#c95c5a;">⏹ Stop</button>
+                <!-- FIX: Clear CPU button (registers only, RAM untouched) -->
+                <button class="btn" onclick="fetch('/clear_cpu').then(r=>r.json()).then(updateVisualization)" style="color:#7db18b; border-color:#7db18b;">Clear CPU</button>
+                <button class="btn" onclick="resetCore()" style="color: #c95c5a; border-color: #c95c5a;">Reset Core</button>
             </div>
 
         </div>
@@ -439,22 +457,47 @@
     // --- AUTO-SCALING LOGIC ---
     function scaleSchematic() {
         const container = document.getElementById('main-container');
-        const targetWidth = 1230; 
-        const targetHeight = 780; 
-        const availableWidth = window.innerWidth - 20; 
+        const targetWidth = 1230;
+        const targetHeight = 780;
+        const availableWidth = window.innerWidth - 20;
         const availableHeight = window.innerHeight - 20;
         const scale = Math.min(availableWidth / targetWidth, availableHeight / targetHeight);
         container.style.transform = `scale(${scale})`;
     }
-
     window.addEventListener('resize', scaleSchematic);
     scaleSchematic();
+
+    // FIX: Connect via WebSocket to receive live updates
+    const socket = io();
 
     let state = {
         PC: "", AC: "", IR: "", CAR: "00000", current_instruction: "", next_instruction: "",
         mode: "IDLE", active_path: [], active_components: [],
-        THB: {}, MPO_decision: false, cycles: 0
+        THB: {}, MPO_decision: false, cycles: 0, clock_cycles_remaining: 0,
+        is_halted: false, temporal_mode_active: false, temporal_mode_instruction: ""
     };
+
+    let autoRunning = false;
+
+    // FIX: Listen to timm-tick socket event for live register/RAM updates
+    socket.on('timm-tick', function(newState) {
+        updateVisualization(newState);
+        // FIX: Also update RAM display from the payload
+        if (newState.memory_bin && newState.memory_mnem && newState.memory_hex) {
+            socket.emit('_relay_memory', {
+                memory_bin: newState.memory_bin,
+                memory_mnem: newState.memory_mnem,
+                memory_hex: newState.memory_hex
+            });
+        }
+    });
+
+    // FIX: Stop button appears on auto-run, hides on stop/halt
+    socket.on('execution_stopped', function(data) {
+        autoRunning = false;
+        document.getElementById('btn-run').style.display = '';
+        document.getElementById('btn-stop').style.display = 'none';
+    });
 
     async function executeStep() {
         try {
@@ -465,11 +508,6 @@
             });
             if (response.ok) {
                 const newState = await response.json();
-                // Simulation logic for CAR display based on MSB
-                if (!newState.CAR) {
-                    const isTemporal = newState.mode === "TEMPORAL" || newState.mode === "TEMPORAL BYPASS";
-                    newState.CAR = (isTemporal ? "1" : "0") + "0000"; 
-                }
                 updateVisualization(newState);
             }
         } catch (error) {
@@ -477,27 +515,83 @@
         }
     }
 
+    function startAutoRun() {
+        autoRunning = true;
+        document.getElementById('btn-run').style.display = 'none';
+        document.getElementById('btn-stop').style.display = '';
+        fetch('/run');
+    }
+
+    function stopAutoRun() {
+        autoRunning = false;
+        document.getElementById('btn-run').style.display = '';
+        document.getElementById('btn-stop').style.display = 'none';
+        fetch('/stop');
+    }
+
+    function resetCore() {
+        autoRunning = false;
+        document.getElementById('btn-run').style.display = '';
+        document.getElementById('btn-stop').style.display = 'none';
+        document.getElementById('temporal-banner').style.display = 'none';
+        fetch('/reset').then(r => r.json()).then(updateVisualization);
+    }
+
     function updateVisualization(newState) {
         state = newState;
-        document.getElementById("reg-pc").innerText = state.PC || "";
-        document.getElementById("reg-ac").innerText = state.AC || "";
-        document.getElementById("reg-ir").innerText = state.IR || "";
+
+        // FIX: Update registers with correct values every tick
+        document.getElementById("reg-pc").innerText = state.PC || "0";
+        document.getElementById("reg-ac").innerText = state.AC || "00";
+        document.getElementById("reg-ir").innerText = state.IR || "00";
         document.getElementById("reg-car").innerText = state.CAR || "00000";
         document.getElementById("reg-inst").innerText = state.current_instruction || "";
         document.getElementById("ui-cycles").innerText = state.cycles || "0";
-        
+
+        // FIX: Display clock cycles cost per instruction
+        const costEl = document.getElementById("ui-clk-cost");
+        if (state.clock_cycles_remaining > 0) {
+            costEl.innerText = state.clock_cycles_remaining + (state.MPO_decision ? " (BYPASS)" : "");
+        }
+
+        // FIX: Temporal mode popup/banner — show when active, hide when not
+        const banner = document.getElementById('temporal-banner');
+        if (state.temporal_mode_active) {
+            document.getElementById('temporal-instruction-label').innerText = state.temporal_mode_instruction || "";
+            banner.style.display = 'block';
+        } else if (!state.temporal_mode_active && state.mode !== "TEMPORAL BYPASS") {
+            banner.style.display = 'none';
+        }
+
         const modeLabel = document.getElementById("ui-mode");
         modeLabel.innerText = state.mode || "IDLE";
-        
-        // Dynamic styling
-        if (state.mode === "TEMPORAL" || state.mode === "TEMPORAL BYPASS") {
+
+        if (state.mode === "TEMPORAL BYPASS") {
             modeLabel.style.borderColor = "var(--bus-temporal)";
             modeLabel.style.color = "var(--bus-temporal)";
             modeLabel.style.background = "#fff7ed";
-        } else if (state.mode !== "IDLE") {
+        } else if (state.mode === "SYSTEM HALTED") {
+            modeLabel.style.borderColor = "#c95c5a";
+            modeLabel.style.color = "#c95c5a";
+            modeLabel.style.background = "#fff0f0";
+            // FIX: Show Stop button state when halted
+            if (autoRunning) {
+                autoRunning = false;
+                document.getElementById('btn-run').style.display = '';
+                document.getElementById('btn-stop').style.display = 'none';
+            }
+        } else if (state.mode === "WAITING FOR INPUT") {
+            modeLabel.style.borderColor = "#d28a5e";
+            modeLabel.style.color = "#d28a5e";
+            modeLabel.style.background = "#fff7ed";
+        } else if (state.mode !== "IDLE" && state.mode !== "PAUSED") {
             modeLabel.style.borderColor = "var(--bus-data)";
             modeLabel.style.color = "var(--bus-data)";
-            modeLabel.style.background = "#ecfdf5"; 
+            modeLabel.style.background = "#ecfdf5";
+        } else {
+            modeLabel.style.borderColor = "#e2e8f0";
+            modeLabel.style.color = "var(--text-light)";
+            modeLabel.style.background = "#ffffff";
         }
 
         document.querySelectorAll('.wire').forEach(w => w.classList.remove('active'));
@@ -507,18 +601,17 @@
         if (state.active_path) {
             state.active_path.forEach(pathId => {
                 const el = document.getElementById(pathId);
-                if(el) el.classList.add('active');
+                if (el) el.classList.add('active');
             });
         }
         if (state.active_components) {
             state.active_components.forEach(compId => {
                 const el = document.getElementById(compId);
-                if(el) el.classList.add('active-comp');
+                if (el) el.classList.add('active-comp');
             });
         }
-        
-        // Add CAR to active components if in execution phase
-        if (state.mode !== "IDLE" && state.mode !== "FETCHING") {
+
+        if (state.mode !== "IDLE" && state.mode !== "PAUSED") {
             document.getElementById('block-car').classList.add('active-comp');
             document.getElementById('wire-car-alu').classList.add('active');
         }
@@ -533,40 +626,59 @@
         document.getElementById("reveal-panel").style.display = "block";
         document.getElementById("reveal-title").innerText = `${component} Inspector`;
         let content = "";
-        
+
         if (component === "CAR") {
             const msb = state.CAR ? state.CAR[0] : "0";
             const source = msb === "1" ? "Temporal History Buffer (THB)" : "System Memory (RAM)";
+            // FIX: Explain Normal vs Temporal mode in popup
             content += `<div style='font-weight:800; margin-bottom:10px;'>Control Status:</div>
                         <div style='background:#f0f7ff; padding:12px; border-radius:6px; border:1px solid #d0e3ff;'>
                             <b>MSB:</b> ${msb}<br>
-                            <b>Source:</b> <span style="color:var(--ic-car)">${source}</span>
+                            <b>Source:</b> <span style="color:var(--ic-car)">${source}</span><br>
+                            <b>State:</b> <span style="color:${msb==='1'?'var(--bus-temporal)':'var(--bus-data)'}">
+                                ${msb==='1' ? 'TEMPORAL BYPASS (4 cycles)' : 'NORMAL FETCH (6 cycles)'}
+                            </span>
                         </div>
                         <div style='margin-top:10px; font-size:12px; color:var(--text-light);'>
-                            MSB=1 engages temporal bypass for high-speed execution.
+                            <b>NORMAL MODE:</b> CPU fetches operand from RAM each cycle (6 T-states).<br>
+                            <b>TEMPORAL BYPASS:</b> MPO detects repeated memory access (≥3 times) and routes
+                            operand directly from Temporal History Buffer, skipping RAM (4 T-states).
                         </div>`;
         }
         else if (component === "THB") {
             content += "<div style='font-weight:800; margin-bottom:10px; color:var(--text-dark);'>History Buffer:</div><table><tr><th>Opcode</th><th>Cycles</th><th>Freq</th></tr>";
             if (state.THB && Object.keys(state.THB).length > 0) {
                 for (const [opcode, data] of Object.entries(state.THB)) {
-                    content += `<tr><td>${opcode}</td><td>${data.cycles}</td><td>${data.count}</td></tr>`;
+                    const isTemporal = data.cycles === 4;
+                    content += `<tr><td>${opcode}</td><td style="color:${isTemporal?'var(--bus-temporal)':'inherit'}">${data.cycles}${isTemporal?' ⚡':''}</td><td>${data.count}</td></tr>`;
                 }
                 content += "</table>";
             } else {
                 content += "</table><p style='color:var(--text-light); margin-top:15px; font-weight:600;'>Buffer is currently empty.</p>";
             }
-        } 
+        }
         else if (component === "MPO") {
-            let statusColor = state.MPO_decision ? "var(--bus-data)" : "var(--text-light)";
-            content += `<div style="margin-bottom:12px; font-weight:800;">Status: <b style="color:${statusColor}">${state.MPO_decision ? 'BYPASS ENGAGED' : 'SCANNING...'}</b></div><div style="background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:8px; font-family:monospace; font-size:14px;"><div><b>B0:</b> <span style="color:var(--bus-control)">${state.current_instruction || 'WAITING'}</span></div><div style="margin-top:8px;"><b>B1:</b> <span style="color:var(--bus-control)">${state.next_instruction || 'WAITING'}</span></div></div>`;
+            // FIX: Describe Normal vs Temporal clearly
+            let statusColor = state.MPO_decision ? "var(--bus-temporal)" : "var(--text-light)";
+            content += `<div style="margin-bottom:8px; font-weight:800;">Status: <b style="color:${statusColor}">${state.MPO_decision ? '⚡ BYPASS ENGAGED' : '🔍 SCANNING...'}</b></div>
+                <div style="background:#f8fafc; padding:12px; border:1px solid #e2e8f0; border-radius:8px; font-family:monospace; font-size:13px;">
+                    <b>Current:</b> <span style="color:var(--bus-control)">${state.current_instruction || 'WAITING'}</span><br>
+                    <b>Next:</b> <span style="color:var(--bus-control)">${state.next_instruction || 'WAITING'}</span>
+                </div>
+                <div style="margin-top:10px; font-size:12px; color:var(--text-light);">
+                    MPO monitors instruction frequency. When a memory-referencing instruction runs ≥3 times,
+                    it signals the CAR to activate Temporal Bypass, reducing cost from 6→4 T-states.
+                </div>`;
         }
         else if (component === "ALU") {
-            content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Current Operation:</div><div style="font-family:monospace; background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:8px; font-weight:bold; font-size:15px; color:var(--bus-control);">${state.current_instruction || 'IDLE'}</div>`;
+            content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Current Operation:</div>
+                <div style="font-family:monospace; background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:8px; font-weight:bold; font-size:15px; color:var(--bus-control);">${state.current_instruction || 'IDLE'}</div>
+                <div style="margin-top:10px; font-size:12px; color:var(--text-light);">AC = ${state.AC || '00'} (hex)</div>`;
         }
         else {
             let val = state[component] || "";
-            content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Register Value:</div><div style="font-family:monospace; font-size:20px; font-weight:bold; background:#f8fafc; padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; color:var(--bus-control); min-height:24px;">${val}</div>`;
+            content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Register Value:</div>
+                <div style="font-family:monospace; font-size:20px; font-weight:bold; background:#f8fafc; padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; color:var(--bus-control); min-height:24px;">${val}</div>`;
         }
         document.getElementById("reveal-content").innerHTML = content;
     }

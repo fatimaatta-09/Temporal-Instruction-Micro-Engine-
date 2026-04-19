@@ -365,7 +365,7 @@
       '7': ['.a','.b','.c'],
       '8': ['.a','.b','.c','.d','.e','.f','.g'],
       '9': ['.a','.b','.c','.d','.f','.g'],
-      ' ': [] // blank
+      ' ': []
     };
 
     // --- Show/Hide Logic ---
@@ -392,72 +392,65 @@
 
     function update7SegmentDisplay(valueNum) {
       if (isNaN(valueNum)) {
-        setDigit(dig0, ' ');
-        setDigit(dig1, ' ');
-        setDigit(dig2, ' ');
+        setDigit(dig0, ' '); setDigit(dig1, ' '); setDigit(dig2, ' ');
         return;
       }
-      
       let displayVal = valueNum;
       if (displayVal > 99.9) displayVal = 99.9;
-
       let str = displayVal.toFixed(1);
-      
-      if (displayVal < 10) {
-        str = " " + str;
-      }
-
+      if (displayVal < 10) str = " " + str;
       setDigit(dig0, str[0]);
-      setDigit(dig1, str[1]); 
+      setDigit(dig1, str[1]);
       setDigit(dig2, str[3]);
     }
 
     // --- Interaction Handlers ---
     clockSlider.addEventListener('input', () => {
       const val = parseFloat(clockSlider.value);
-      clockInput.value = val; 
-      update7SegmentDisplay(val); 
-      
-      // NEW: Send the updated speed to Python instantly while dragging the slider
+      clockInput.value = val;
+      update7SegmentDisplay(val);
       socket.emit('set_speed', { speed: val });
     });
 
     clockInput.addEventListener('input', () => {
       let val = parseFloat(clockInput.value);
-      
       if (isNaN(val)) {
         setDigit(dig0, ' '); setDigit(dig1, ' '); setDigit(dig2, ' ');
       } else {
         update7SegmentDisplay(val);
-        
-        let sliderVal = val;
-        if (sliderVal < 0.2) sliderVal = 0.2;
-        if (sliderVal > 50) sliderVal = 50;
+        let sliderVal = Math.max(0.2, Math.min(50, val));
         clockSlider.value = sliderVal;
-        
-        // NEW: Send speed to Python while typing
         socket.emit('set_speed', { speed: sliderVal });
       }
     });
 
     clockInput.addEventListener('change', () => {
       let val = parseFloat(clockInput.value);
-      
       if (isNaN(val) || val < 0.2) val = 0.2;
       if (val > 50) val = 50;
-      
       clockInput.value = val;
-      clockSlider.value = val; 
-      update7SegmentDisplay(val); 
-
-      // NEW: Send speed to Python when pressing Enter / clicking away
+      clockSlider.value = val;
+      update7SegmentDisplay(val);
       socket.emit('set_speed', { speed: val });
+    });
+
+    // FIX: Listen to timm-tick to show clock cycles cost on the clock display
+    // When CPU executes, briefly flash the cycle cost on the readout
+    let cycleFlashTimeout = null;
+    socket.on('timm-tick', (state) => {
+      if (state.clock_cycles_remaining && state.clock_cycles_remaining > 0) {
+        // Briefly show cycle cost in the 7-seg (as "CX" pattern) then restore Hz
+        // We simply let the hand animate faster; just restore after 600ms
+        if (cycleFlashTimeout) clearTimeout(cycleFlashTimeout);
+        cycleFlashTimeout = setTimeout(() => {
+          update7SegmentDisplay(parseFloat(clockSlider.value));
+        }, 600);
+      }
     });
 
     // --- Clock Hand Animation Logic ---
     let currentRotation = 0;
     let lastTime = performance.now();
-    
     let timeAtMax = 0;
     let handFlewOff = false;
     let flyOffX = 0, flyOffY = 0, flyOffVX = 0, flyOffVY = 0;
@@ -466,7 +459,6 @@
     function animateClockHand(currentTime) {
       const deltaTime = currentTime - lastTime;
       lastTime = currentTime;
-
       const hz = parseFloat(clockSlider.value) || 0.2;
 
       if (hz >= 50) {
@@ -475,44 +467,36 @@
         timeAtMax = 0;
         if (handFlewOff) {
           handFlewOff = false;
-          flyOffX = 0; flyOffY = 0; 
+          flyOffX = 0; flyOffY = 0;
         }
       }
 
       let wobble = 0;
-      if (timeAtMax > 1500 && !handFlewOff) {
-        wobble = Math.sin(timeAtMax * 0.05) * 8; 
-      }
+      if (timeAtMax > 1500 && !handFlewOff) wobble = Math.sin(timeAtMax * 0.05) * 8;
 
       if (timeAtMax > 2500 && !handFlewOff) {
         handFlewOff = true;
-        flyOffVX = 15; 
-        flyOffVY = -20; 
-        flyRotation = currentRotation;
+        flyOffVX = 15; flyOffVY = -20; flyRotation = currentRotation;
       }
 
       if (handFlewOff) {
         flyOffX += flyOffVX;
         flyOffY += flyOffVY;
-        flyOffVY += 1; 
-        flyRotation += 45; 
-        
+        flyOffVY += 1;
+        flyRotation += 45;
         clockHand.setAttribute('transform', `translate(${flyOffX}, ${flyOffY}) rotate(${flyRotation}, 100, 100)`);
       } else {
         const degreesToRotate = hz * 360 * (deltaTime / 1000);
         currentRotation = (currentRotation + degreesToRotate) % 360;
-        
         clockHand.setAttribute('transform', `rotate(${currentRotation + wobble}, 100, 100)`);
       }
 
       requestAnimationFrame(animateClockHand);
     }
 
-    // Initialize 
+    // Initialize
     update7SegmentDisplay(1.0);
     requestAnimationFrame(animateClockHand);
-    
-    // NEW: On page load, sync the default starting speed (1.0 Hz) to the Python backend
     socket.emit('set_speed', { speed: 1.0 });
 
   </script>

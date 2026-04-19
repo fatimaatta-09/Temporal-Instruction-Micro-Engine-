@@ -76,6 +76,31 @@
       cursor: pointer;
     }
 
+    /* FIX: Mode selector buttons for BIN / HEX / MNEM */
+    .mode-btns {
+      display: flex;
+      gap: 4px;
+    }
+
+    .mode-btn {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border: 1px solid #b8b4c7;
+      border-radius: 3px;
+      cursor: pointer;
+      background: #fff;
+      color: #5a5475;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: #5a5475;
+      color: #fff;
+      border-color: #5a5475;
+    }
+
     .btn {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
@@ -156,10 +181,12 @@
     <h2 class="main-title">Main Memory (RAM)</h2>
 
     <div class="top-controls">
-      <label class="checkbox-group">
-        <input type="checkbox" id="chk-mnemonics" checked>
-        Mnemonics
-      </label>
+      <!-- FIX: Three display modes — MNEM, BIN, HEX -->
+      <div class="mode-btns">
+        <button class="mode-btn active" id="btn-mnem" onclick="setMode('mnem')">MNEM</button>
+        <button class="mode-btn" id="btn-hex" onclick="setMode('hex')">HEX</button>
+        <button class="mode-btn" id="btn-bin" onclick="setMode('bin')">BIN</button>
+      </div>
       <button class="btn" id="btn-clear">Clear</button>
     </div>
 
@@ -170,14 +197,26 @@
 
   <script>
     const socket = io();
-    
+
     const memoryWrapper = document.getElementById('memory-wrapper');
-    const chkMnemonics = document.getElementById('chk-mnemonics');
     const btnClear = document.getElementById('btn-clear');
 
-    // Local cached states updated via websockets
-    let cachedMemoryBin = Array(16).fill("00000000");
-    let cachedMemoryMnemonics = Array(16).fill("NOP");
+    // FIX: Three cached states — bin, hex, mnem
+    let cachedMemoryBin   = Array(16).fill("00000000");
+    let cachedMemoryMnem  = Array(16).fill("NOP");
+    let cachedMemoryHex   = Array(16).fill("00");
+    let displayMode = 'mnem'; // 'mnem', 'hex', 'bin'
+
+    // FIX: Track which cell is being edited to avoid overwriting user input
+    let editingAddress = -1;
+
+    function setMode(mode) {
+      displayMode = mode;
+      ['mnem','hex','bin'].forEach(m => {
+        document.getElementById('btn-' + m).classList.toggle('active', m === mode);
+      });
+      refreshMemoryDisplay();
+    }
 
     // 1. Build the 16 slots dynamically
     function buildMemorySlots() {
@@ -187,16 +226,18 @@
 
         const label = document.createElement('div');
         label.className = 'memory-address';
-        // Display Address as Hex (0-F)
         label.textContent = i.toString(16).toUpperCase();
 
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'memory-input';
         input.id = `mem-input-${i}`;
-        input.value = "NOP"; 
-        
-        // When the user clicks away or hits enter, send to Python
+        input.value = "NOP";
+
+        // FIX: Track focus so we don't overwrite during typing
+        input.addEventListener('focus', () => { editingAddress = i; });
+        input.addEventListener('blur',  () => { editingAddress = -1; });
+
         input.addEventListener('change', (e) => {
           socket.emit('update_memory_slot', { address: i, value: e.target.value });
         });
@@ -207,39 +248,47 @@
       }
     }
 
-    // 2. Refresh visuals based on the checkbox toggle
+    // 2. Refresh visuals based on display mode
     function refreshMemoryDisplay() {
-      const useMnemonics = chkMnemonics.checked;
       for (let i = 0; i < 16; i++) {
+        if (editingAddress === i) continue; // Don't touch the cell being edited
         const input = document.getElementById(`mem-input-${i}`);
-        if (useMnemonics) {
-          input.value = cachedMemoryMnemonics[i];
-        } else {
-          input.value = cachedMemoryBin[i]; // Raw 8-bit Binary
-        }
+        if (displayMode === 'mnem') input.value = cachedMemoryMnem[i];
+        else if (displayMode === 'hex') input.value = cachedMemoryHex[i];
+        else input.value = cachedMemoryBin[i];
       }
+    }
+
+    // FIX: Highlight a memory cell briefly when it changes during execution
+    function flashCell(i) {
+      const input = document.getElementById(`mem-input-${i}`);
+      if (!input) return;
+      input.style.background = '#e0ffe0';
+      setTimeout(() => { input.style.background = ''; }, 400);
     }
 
     // --- SOCKET LISTENERS ---
 
-    // Ask backend for current memory state on load
     socket.emit('request_memory_sync');
 
+    // FIX: memory_sync now includes hex field
     socket.on('memory_sync', (state) => {
-        cachedMemoryBin = state.memory_bin;
-        cachedMemoryMnemonics = state.memory_mnem;
-        refreshMemoryDisplay();
+      const oldBin = [...cachedMemoryBin];
+      cachedMemoryBin  = state.memory_bin  || cachedMemoryBin;
+      cachedMemoryMnem = state.memory_mnem || cachedMemoryMnem;
+      cachedMemoryHex  = state.memory_hex  || cachedMemoryHex;
+      // Flash cells that changed
+      for (let i = 0; i < 16; i++) {
+        if (cachedMemoryBin[i] !== oldBin[i]) flashCell(i);
+      }
+      refreshMemoryDisplay();
     });
 
     btnClear.addEventListener('click', () => {
       socket.emit('clear_memory');
     });
 
-    chkMnemonics.addEventListener('change', refreshMemoryDisplay);
-
-    // Build the grid immediately on page load
     buildMemorySlots();
-
   </script>
 </body>
 </html>
