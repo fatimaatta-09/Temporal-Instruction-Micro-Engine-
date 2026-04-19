@@ -124,8 +124,17 @@ def assemble(text):
         try: return int(text, 16) & 0xFF
         except: pass
 
-    impl_map = {"NOP": 0x00, "HLT": 0xF0, "CLR": 0xE0, "SHL": 0xE1, "SHR": 0xE2,
-                "INP": 0xE3, "OUT": 0xE4, "ION": 0xE5, "IOF": 0xE6}
+    # Fixed single-operand instructions
+    impl_map = {
+        "NOP": 0x00, "HLT": 0xF0, "CLR": 0xE0, "SHL": 0xE1, "SHR": 0xE2,
+        "ION": 0xE5, "IOF": 0xE6,
+        # Port-1 shortcuts (backward compat)
+        "INP": 0xE3, "OUT": 0xE4,
+        # Port-specific OUT opcodes: OUT 1=0xE4, OUT 2=0xEB, OUT 3=0xEC
+        "OUT 1": 0xE4, "OUT 2": 0xEB, "OUT 3": 0xEC,
+        # Port-specific INP opcodes: INP 1=0xE3, INP 2=0xED
+        "INP 1": 0xE3, "INP 2": 0xED,
+    }
     if text in impl_map: return impl_map[text]
 
     op_map = {1: "LDA", 2: "STA", 3: "ADD", 4: "SUB", 5: "MVI", 6: "ADI",
@@ -147,8 +156,12 @@ def assemble(text):
     return 0
 
 def disassemble(val):
-    impl_map = {0x00: "NOP", 0xF0: "HLT", 0xE0: "CLR", 0xE1: "SHL", 0xE2: "SHR",
-                0xE3: "INP", 0xE4: "OUT", 0xE5: "ION", 0xE6: "IOF"}
+    impl_map = {
+        0x00: "NOP", 0xF0: "HLT", 0xE0: "CLR", 0xE1: "SHL", 0xE2: "SHR",
+        0xE3: "INP 1", 0xE4: "OUT 1", 0xE5: "ION", 0xE6: "IOF",
+        0xEB: "OUT 2", 0xEC: "OUT 3",
+        0xED: "INP 2",
+    }
     if val in impl_map: return impl_map[val]
 
     high = (val >> 4) & 0xF
@@ -334,18 +347,40 @@ def _do_step():
     elif ir_val == 0xF0: # HLT
         cpu_state["is_halted"] = True
         cpu_state["mode"] = "SYSTEM HALTED"
-    elif ir_val == 0xE3: # INP — FIX: Halt and wait, do NOT advance PC
+    elif ir_val == 0xE3: # INP 1 (Keypad) — halt and wait, do NOT advance PC
         cpu_waiting_for_input = True
         active_in_port = 1
-        cpu_state["mode"] = "WAITING FOR INPUT"
+        cpu_state["mode"] = "WAITING FOR INPUT (KEYPAD)"
         cpu_state["active_path"] = active_wires
         cpu_state["active_components"] = active_comps
         socketio.emit('request_input')
         broadcast_memory()
         socketio.emit('timm-tick', format_cpu_response())
-        return  # Do not advance PC here
-    elif ir_val == 0xE4: # OUT
+        return  # Do not advance PC — keypad_enter_pressed handler will advance it
+    elif ir_val == 0xED: # INP 2 (Network) — read from network buffer or wait
+        if len(network_rx_buffer) > 0:
+            cpu_state["AC"] = network_rx_buffer.pop(0) & 0xFF
+            socketio.emit('update_nc_buffer_ui', {'count': len(network_rx_buffer)})
+            active_comps.extend(["block-ac"])
+        else:
+            # Buffer empty — halt and wait for a LAN packet
+            cpu_waiting_for_input = True
+            active_in_port = 2
+            cpu_state["mode"] = "WAITING FOR INPUT (NETWORK)"
+            cpu_state["active_path"] = active_wires
+            cpu_state["active_components"] = active_comps
+            socketio.emit('request_input')
+            broadcast_memory()
+            socketio.emit('timm-tick', format_cpu_response())
+            return
+    elif ir_val == 0xE4: # OUT 1 — Display (Accumulator → Screen)
         execute_out_instruction(1, cpu_state["AC"])
+        active_comps.extend(["block-ac"])
+    elif ir_val == 0xEB: # OUT 2 — Printer (Accumulator → Printer buffer)
+        execute_out_instruction(2, cpu_state["AC"])
+        active_comps.extend(["block-ac"])
+    elif ir_val == 0xEC: # OUT 3 — Network (Accumulator → LAN broadcast)
+        execute_out_instruction(3, cpu_state["AC"])
         active_comps.extend(["block-ac"])
 
     cpu_state["PC"] = next_pc
@@ -536,7 +571,7 @@ def handle_edit_file():
 @socketio.on('keypad_enter_pressed')
 def handle_keypad_enter(data):
     global cpu_waiting_for_input, accumulator, cpu_state, active_in_port
-    if cpu_waiting_for_input and active_in_port == 1:
+    if cpu_waiting_for_input:  # Accept from keypad for any port-wait if no other source
         try:
             val = int(data['value']) & 0xFF
             accumulator = val

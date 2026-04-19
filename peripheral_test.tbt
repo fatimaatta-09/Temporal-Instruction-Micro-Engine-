@@ -1,0 +1,10 @@
+ORG 0
+MVI A       ; Load Hex 'A' (10) into AC
+OUT 2       ; Send to Port 2 (Printer)
+MVI B       ; Load Hex 'B' (11) into AC
+OUT 2       ; Send to Port 2 (Printer)
+MVI C       ; Load Hex 'C' (12) into AC
+OUT 3       ; Send to Port 3 (Network)
+MVI D       ; Load Hex 'D' (13) into AC
+OUT 3       ; Send to Port 3 (Network)
+HLT         ; Halt System

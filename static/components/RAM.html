@@ -236,7 +236,21 @@
 
         // FIX: Track focus so we don't overwrite during typing
         input.addEventListener('focus', () => { editingAddress = i; });
-        input.addEventListener('blur',  () => { editingAddress = -1; });
+        input.addEventListener('blur',  (e) => {
+          editingAddress = -1;
+          // Send immediately on blur
+          socket.emit('update_memory_slot', { address: i, value: e.target.value });
+        });
+
+        // FIX: Also send on Enter key press for faster direct-writing workflow
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            socket.emit('update_memory_slot', { address: i, value: e.target.value });
+            // Move focus to next slot
+            const nextInput = document.getElementById(`mem-input-${(i + 1) % 16}`);
+            if (nextInput) nextInput.focus();
+          }
+        });
 
         input.addEventListener('change', (e) => {
           socket.emit('update_memory_slot', { address: i, value: e.target.value });
