@@ -74,6 +74,28 @@
       overflow: hidden;
     }
 
+    /* Stats footer */
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 15px;
+      border-top: 1px solid #e2e2ec;
+      background: #f8f8fc;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      color: #5a5475;
+      flex-shrink: 0;
+    }
+    .stat-badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .stat-buffered { background: #fff3e0; color: #d28a5e; border: 1px solid #d28a5e; }
+    .stat-broadcast { background: #fdf4ff; color: #d42df2; border: 1px solid #d42df2; }
+
     /* --- LOGS TABLE WRAPPER --- */
     .logs-wrapper {
       width: 100%;
@@ -146,6 +168,12 @@
     </div>
   </div>
 
+  <div class="stats-bar">
+    <span>TOTAL: <b id="stat-total">0</b></span>
+    <span class="stat-badge stat-buffered">IN: <span id="stat-buffered">0</span></span>
+    <span class="stat-badge stat-broadcast">OUT: <span id="stat-broadcast">0</span></span>
+  </div>
+
   <script>
     const socket = io();
     const logsBody = document.getElementById('logs-body');
@@ -163,22 +191,29 @@
 
     // --- 3. RENDER THE LOGS ---
     socket.on('deliver_network_logs', (data) => {
-        logsBody.innerHTML = ''; // Clear table
+        logsBody.innerHTML = '';
         
         if (data.logs.length === 0) {
             logsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; font-style: italic;">No activity yet.</td></tr>';
+            document.getElementById('stat-total').innerText = 0;
+            document.getElementById('stat-buffered').innerText = 0;
+            document.getElementById('stat-broadcast').innerText = 0;
             return;
         }
+
+        // Stats
+        const bufferedCount = data.logs.filter(l => l.status === 'Buffered').length;
+        const broadcastCount = data.logs.filter(l => l.status === 'Broadcast').length;
+        document.getElementById('stat-total').innerText = data.logs.length;
+        document.getElementById('stat-buffered').innerText = bufferedCount;
+        document.getElementById('stat-broadcast').innerText = broadcastCount;
         
-        // Reverse the array so the newest logs appear at the top of the table
+        // Newest logs at top
         [...data.logs].reverse().forEach(log => {
             const row = document.createElement('tr');
-            
-            // Assign specific CSS classes based on the status for cool coloring
             let statusClass = '';
             if (log.status === 'Buffered') statusClass = 'status-buffered';
             if (log.status === 'Broadcast') statusClass = 'status-broadcast';
-
             row.innerHTML = `
                 <td>${log.time}</td>
                 <td><strong>${log.source}</strong></td>

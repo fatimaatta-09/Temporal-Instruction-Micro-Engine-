@@ -1,0 +1,11 @@
+ORG 0       ; Start at Memory Address 0
+MVI 5       ; T0-T3: Load Immediate '5' into AC
+STA E       ; T0-T5: Store AC in RAM Slot E (The Counter)
+MVI 1       ; T0-T3: Load Immediate '1' into AC
+STA F       ; T0-T5: Store AC in RAM Slot F (The Decrementer)
+LDA E       ; T0-T5: (Loop Start) Load counter from E
+OUT 1       ; T0-T3: Display current counter on screen
+SUB F       ; T0-T5: Subtract Slot F from AC
+STA E       ; T0-T5: Update counter in Slot E
+JNZ 4       ; T0-T3: If AC != 0, Jump back to Address 4
+HLT         ; T0-T3: System Halt

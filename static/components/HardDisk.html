@@ -179,6 +179,17 @@
     /* Special colors for specific actions */
     .btn-save:hover { background-color: #4CAF50; color: white; border-color: #4CAF50;}
     .btn-edit:hover { background-color: #00d2ff; color: white; border-color: #00d2ff;}
+    .btn-reload { border-color: #d28a5e; color: #d28a5e; display: none; }
+    .btn-reload:hover { background-color: #d28a5e; color: white; border-color: #d28a5e;}
+    .edit-note {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      color: #d28a5e;
+      text-align: center;
+      margin-top: 6px;
+      display: none;
+      height: 13px;
+    }
   </style>
 </head>
 <body>
@@ -220,6 +231,10 @@
             <button class="btn" id="btn-open">Open</button>
             <button class="btn btn-edit" id="btn-edit">Edit</button>
           </div>
+          <div class="actions" style="margin-top:6px;">
+            <button class="btn btn-reload" id="btn-reload" title="Re-parse file after editing in Notepad">↺ Reload</button>
+          </div>
+          <div class="edit-note" id="edit-note">↑ Click after saving in Notepad</div>
         </div>
 
       </div>
@@ -237,40 +252,51 @@
     const btnSave = document.getElementById('btn-save');
     const btnOpen = document.getElementById('btn-open');
     const btnEdit = document.getElementById('btn-edit');
+    const btnReload = document.getElementById('btn-reload');
+    const editNote = document.getElementById('edit-note');
 
     // --- BUTTON EVENT LISTENERS ---
 
     // 1. Program: Load
     btnLoad.addEventListener('click', () => {
-        // Asks Python to open the Windows File Dialog
         socket.emit('hd_request_file_dialog', { type: 'program' });
     });
 
-    // 2. Data File: Open (Does the exact same thing as Load)
+    // 2. Data File: Open
     btnOpen.addEventListener('click', () => {
         socket.emit('hd_request_file_dialog', { type: 'data' });
     });
 
-    // 3. Program: Save
+    // 3. Program: Save (transfers buffer → RAM with full reset)
     btnSave.addEventListener('click', () => {
-        // Tells Python to transfer the buffer to RAM
         socket.emit('hd_save_to_ram');
     });
 
-    // 4. Data File: Edit
+    // 4. Data File: Edit — open Notepad, then reveal Reload button
     btnEdit.addEventListener('click', () => {
-        // Tells Python to boot up Notepad.exe
         socket.emit('hd_edit_file');
+        // Show the Reload button so user knows to click it after saving in Notepad
+        btnReload.style.display = 'inline-block';
+        editNote.style.display = 'block';
+        fileStatus.innerText = 'EDITING IN NOTEPAD — RELOAD WHEN DONE';
+    });
+
+    // 5. Reload — re-parse the file from disk after external edit
+    btnReload.addEventListener('click', () => {
+        socket.emit('hd_reload_after_edit');
+        fileStatus.innerText = 'RELOADING...';
+        btnReload.style.display = 'none';
+        editNote.style.display = 'none';
     });
 
     // --- SOCKET LISTENERS FROM PYTHON ---
 
-    // A file was successfully picked and parsed by Python
+    // File successfully loaded/reloaded
     socket.on('hd_file_loaded', (data) => {
-        traceLogBody.innerHTML = ''; // Clear table
+        traceLogBody.innerHTML = '';
         fileStatus.innerText = `LOADED: ${data.filename}`;
-        
-        // Loop through the data and build the table rows
+        btnReload.style.display = 'none';
+        editNote.style.display = 'none';
         data.table.forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -282,18 +308,14 @@
         });
     });
 
-    // The user clicked "Save" and Python successfully cleared the Hard Disk
+    // Save to RAM completed — buffer cleared
     socket.on('hd_cleared', () => {
         traceLogBody.innerHTML = '';
-        fileStatus.innerText = 'BUFFER CLEARED (SAVED TO RAM)';
-        
-        // Reset status after a few seconds
-        setTimeout(() => {
-             fileStatus.innerText = 'NO FILE LOADED';
-        }, 3000);
+        fileStatus.innerText = 'BUFFER CLEARED — LOADED INTO RAM';
+        setTimeout(() => { fileStatus.innerText = 'NO FILE LOADED'; }, 3000);
     });
 
-    // Handle Errors (e.g., clicking edit before loading a file)
+    // Errors
     socket.on('hd_error', (data) => {
         alert("Hard Disk Error: " + data.msg);
     });

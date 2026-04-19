@@ -244,11 +244,64 @@
       color: #333333;
     }
 
+    /* --- BYPASS MODE INDICATOR --- */
+    .bypass-badge {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1.5px solid #b8b4c7;
+      color: #b8b4c7;
+      background: #ffffff;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
+    }
+    .bypass-badge.active {
+      border-color: #d28a5e;
+      color: #d28a5e;
+      background: #fff7ed;
+      box-shadow: 0 0 8px rgba(210,138,94,0.3);
+    }
+
+    /* Cycle cost flash label */
+    .cycle-flash {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1.5px solid #b8b4c7;
+      color: #b8b4c7;
+      background: #ffffff;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
+    }
+    .cycle-flash.show-4 {
+      border-color: #d28a5e;
+      color: #d28a5e;
+      background: #fff7ed;
+    }
+    .cycle-flash.show-6 {
+      border-color: #75b8b6;
+      color: #75b8b6;
+      background: #ecfdf5;
+    }
+
   </style>
 </head>
 <body>
 
-  <div class="clock-module sim-module">
+  <div class="clock-module sim-module" style="position:relative;">
+
+    <div class="cycle-flash" id="cycle-flash">T: —</div>
+    <div class="bypass-badge" id="bypass-badge">NORMAL</div>
 
     <div class="clock-contents" id="clock-contents">
       
@@ -434,17 +487,37 @@
       socket.emit('set_speed', { speed: val });
     });
 
-    // FIX: Listen to timm-tick to show clock cycles cost on the clock display
-    // When CPU executes, briefly flash the cycle cost on the readout
+    // --- Clock tick: update cycle cost flash + bypass badge ---
+    const cycleFashEl = document.getElementById('cycle-flash');
+    const bypassBadge = document.getElementById('bypass-badge');
     let cycleFlashTimeout = null;
+
     socket.on('timm-tick', (state) => {
-      if (state.clock_cycles_remaining && state.clock_cycles_remaining > 0) {
-        // Briefly show cycle cost in the 7-seg (as "CX" pattern) then restore Hz
-        // We simply let the hand animate faster; just restore after 600ms
+      const cost = state.clock_cycles_remaining;
+      const isBypass = state.MPO_decision === true;
+      const manualOff = state.temporal_bypass_manual_enabled === false;
+
+      // Bypass badge
+      if (manualOff) {
+        bypassBadge.textContent = 'BYPASS OFF';
+        bypassBadge.className = 'bypass-badge';
+      } else if (isBypass) {
+        bypassBadge.textContent = '⚡ BYPASS';
+        bypassBadge.className = 'bypass-badge active';
+      } else {
+        bypassBadge.textContent = 'NORMAL';
+        bypassBadge.className = 'bypass-badge';
+      }
+
+      // Cycle cost flash
+      if (cost && cost > 0) {
+        cycleFashEl.textContent = `T: ${cost}`;
+        cycleFashEl.className = cost <= 4 ? 'cycle-flash show-4' : 'cycle-flash show-6';
         if (cycleFlashTimeout) clearTimeout(cycleFlashTimeout);
         cycleFlashTimeout = setTimeout(() => {
-          update7SegmentDisplay(parseFloat(clockSlider.value));
-        }, 600);
+          cycleFashEl.textContent = 'T: —';
+          cycleFashEl.className = 'cycle-flash';
+        }, 900);
       }
     });
 

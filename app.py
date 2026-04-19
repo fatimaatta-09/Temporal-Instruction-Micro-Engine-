@@ -61,10 +61,14 @@ cpu_waiting_for_input = False
 active_in_port = 0
 accumulator = 0
 
-# FIX: Added clock_cycles_remaining + temporal_mode fields
+# Manual bypass toggle — allows user to force-disable temporal mode for comparison
+temporal_bypass_manual_enabled = True  # True = normal hardware behaviour; False = user-disabled bypass
+
+# CAR is 5-bit: MSB=0 → Normal (fetch from RAM, 6 cycles); MSB=1 → Temporal Bypass (skip MBR, 4 cycles)
 cpu_state = {
     "PC": 0, "AC": 0, "IR": 0, "CAR": "00000", "cycles": 0,
     "clock_cycles_remaining": 0,
+    "zero_flag": False,          # ALU zero flag — drives JNZ correctly
     "mode": "IDLE", "MPO_decision": False, "THB": {},
     "is_halted": False, "fgi_flag": False, "input_buffer": 0,
     "active_path": [], "active_components": [],
@@ -212,7 +216,7 @@ def basic_tbt_assembler(filepath):
 # ==========================================
 
 def format_cpu_response():
-    global cpu_state, main_memory
+    global cpu_state, main_memory, temporal_bypass_manual_enabled
     curr_ir = cpu_state["IR"]
     next_pc = cpu_state["PC"] & 0xF
     next_ir = main_memory[next_pc]
@@ -223,6 +227,7 @@ def format_cpu_response():
         "CAR": cpu_state["CAR"],
         "cycles": cpu_state["cycles"],
         "clock_cycles_remaining": cpu_state["clock_cycles_remaining"],
+        "zero_flag": cpu_state["zero_flag"],
         "mode": cpu_state["mode"],
         "temporal_mode_active": cpu_state["temporal_mode_active"],
         "temporal_mode_instruction": cpu_state["temporal_mode_instruction"],
@@ -233,6 +238,7 @@ def format_cpu_response():
         "active_path": cpu_state["active_path"],
         "active_components": cpu_state["active_components"],
         "is_halted": cpu_state["is_halted"],
+        "temporal_bypass_manual_enabled": temporal_bypass_manual_enabled,
         "memory": [f"{v:02X}" for v in main_memory],
         "memory_bin": [f"{v:08b}" for v in main_memory],
         "memory_mnem": [disassemble(v) for v in main_memory],
@@ -256,7 +262,7 @@ def execute_out_instruction(port, ac_value):
 
 def _do_step():
     """Core single-instruction step. Called by /step and auto_run_loop."""
-    global cpu_state, main_memory, active_in_port, cpu_waiting_for_input
+    global cpu_state, main_memory, active_in_port, cpu_waiting_for_input, temporal_bypass_manual_enabled
 
     if cpu_state["is_halted"] or cpu_waiting_for_input:
         return
@@ -271,78 +277,115 @@ def _do_step():
 
     ir_hex = disassemble(ir_val)
 
+    # --- THB: Track unique instruction signatures ---
+    # Each entry keyed by the full disassembled instruction string (the "signature")
     if ir_hex not in cpu_state["THB"]:
         cpu_state["THB"][ir_hex] = {"count": 0, "cycles": 6}
     cpu_state["THB"][ir_hex]["count"] += 1
     count = cpu_state["THB"][ir_hex]["count"]
 
     is_mem_ref = opcode in [1, 2, 3, 4, 9, 0xA]
-    cycle_cost = 6 if is_mem_ref else 4
-    cpu_state["MPO_decision"] = False
-    car_msb = "0"
-    active_wires = ["wire-pc-data", "wire-ir-data", "wire-pc-addr"]
-    active_comps = ["block-pc", "block-ir"]
 
-    # FIX: Temporal bypass — track persistently and store triggering instruction
-    if is_mem_ref and count >= 3:
-        cpu_state["MPO_decision"] = True
+    # --- CAR MSB LOGIC ---
+    # MSB=0 → Normal mode: data flows through MBR from RAM (6 T-states)
+    # MSB=1 → Temporal Bypass: MBR is bypassed, THB feeds operand directly (4 T-states)
+    # Only engage bypass if: instruction is memory-referencing, seen ≥3 times,
+    # AND the manual toggle has not been disabled by the user.
+    bypass_eligible = is_mem_ref and count >= 3 and temporal_bypass_manual_enabled
+
+    car_msb = "1" if bypass_eligible else "0"
+    cycle_cost = 4 if bypass_eligible else (6 if is_mem_ref else 4)
+
+    cpu_state["MPO_decision"] = bypass_eligible
+
+    if bypass_eligible:
         cpu_state["mode"] = "TEMPORAL BYPASS"
         cpu_state["temporal_mode_active"] = True
         cpu_state["temporal_mode_instruction"] = ir_hex
-        cycle_cost = 4
-        car_msb = "1"
         cpu_state["THB"][ir_hex]["cycles"] = 4
-        active_wires.extend(["wire-mem-alu-bypass"])
-        active_comps.extend(["block-mpo", "block-tbh"])
     else:
         cpu_state["mode"] = "NORMAL EXECUTION"
+        # Keep temporal_mode_active True if it was set previously (sticky banner)
+        # but update the label only if currently engaged
+        if not cpu_state["temporal_mode_active"]:
+            cpu_state["temporal_mode_instruction"] = ""
+
+    active_wires = ["wire-pc-data", "wire-ir-data", "wire-pc-addr"]
+    active_comps = ["block-pc", "block-ir"]
+
+    if bypass_eligible:
+        active_wires.extend(["wire-mem-alu-bypass"])
+        active_comps.extend(["block-mpo", "block-tbh"])
 
     next_pc = (pc_val + 1) & 0xF
 
-    if opcode == 1:      # LDA
-        cpu_state["AC"] = main_memory[actual_addr]
+    # --- ALU OPERATIONS — 8-bit integer math, Zero Flag updated ---
+    if opcode == 1:      # LDA — load AC from RAM; not an ALU compute, but sets Z
+        cpu_state["AC"] = main_memory[actual_addr] & 0xFF
+        cpu_state["zero_flag"] = (cpu_state["AC"] == 0)
         active_wires.extend(["wire-alu-data", "wire-ac-data"])
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 2:    # STA — FIX: writes back to RAM
+    elif opcode == 2:    # STA — write AC to RAM (no ALU, no flag change)
         main_memory[actual_addr] = cpu_state["AC"]
         active_wires.extend(["wire-ac-alu", "wire-alu-data"])
         active_comps.extend(["block-alu"])
-    elif opcode == 3:    # ADD
-        cpu_state["AC"] = (cpu_state["AC"] + main_memory[actual_addr]) & 0xFF
+    elif opcode == 3:    # ADD — 8-bit addition, update Z
+        result = (cpu_state["AC"] + main_memory[actual_addr]) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 4:    # SUB
-        cpu_state["AC"] = (cpu_state["AC"] - main_memory[actual_addr]) & 0xFF
+    elif opcode == 4:    # SUB — 8-bit subtraction, update Z
+        result = (cpu_state["AC"] - main_memory[actual_addr]) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 9:    # AND
-        cpu_state["AC"] = cpu_state["AC"] & main_memory[actual_addr]
+    elif opcode == 9:    # AND — bitwise AND, update Z
+        result = cpu_state["AC"] & main_memory[actual_addr] & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 0xA:  # OR
-        cpu_state["AC"] = cpu_state["AC"] | main_memory[actual_addr]
+    elif opcode == 0xA:  # OR — bitwise OR, update Z
+        result = (cpu_state["AC"] | main_memory[actual_addr]) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 5:    # MVI
-        cpu_state["AC"] = actual_addr
+    elif opcode == 5:    # MVI — move immediate nibble into AC
+        cpu_state["AC"] = actual_addr & 0xFF
+        cpu_state["zero_flag"] = (cpu_state["AC"] == 0)
         active_comps.extend(["block-ac"])
-    elif opcode == 6:    # ADI
-        cpu_state["AC"] = (cpu_state["AC"] + actual_addr) & 0xFF
+    elif opcode == 6:    # ADI — add immediate
+        result = (cpu_state["AC"] + actual_addr) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 7:    # JMP
+    elif opcode == 7:    # JMP — unconditional jump
         next_pc = actual_addr
-    elif opcode == 8:    # JNZ
-        if cpu_state["AC"] != 0: next_pc = actual_addr
+    elif opcode == 8:    # JNZ — jump if NOT zero (reads ALU zero_flag correctly)
+        if not cpu_state["zero_flag"]:
+            next_pc = actual_addr
     elif opcode == 0xC:  # INC
-        cpu_state["AC"] = (cpu_state["AC"] + 1) & 0xFF
+        result = (cpu_state["AC"] + 1) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
     elif opcode == 0xD:  # DEC
-        cpu_state["AC"] = (cpu_state["AC"] - 1) & 0xFF
+        result = (cpu_state["AC"] - 1) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
     elif ir_val == 0xE0: # CLR
         cpu_state["AC"] = 0
+        cpu_state["zero_flag"] = True
         active_comps.extend(["block-ac"])
     elif ir_val == 0xE1: # SHL
-        cpu_state["AC"] = (cpu_state["AC"] << 1) & 0xFF
+        result = (cpu_state["AC"] << 1) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
     elif ir_val == 0xE2: # SHR
-        cpu_state["AC"] = (cpu_state["AC"] >> 1) & 0xFF
+        result = (cpu_state["AC"] >> 1) & 0xFF
+        cpu_state["AC"] = result
+        cpu_state["zero_flag"] = (result == 0)
         active_comps.extend(["block-alu", "block-ac"])
     elif ir_val == 0xF0: # HLT
         cpu_state["is_halted"] = True
@@ -356,14 +399,14 @@ def _do_step():
         socketio.emit('request_input')
         broadcast_memory()
         socketio.emit('timm-tick', format_cpu_response())
-        return  # Do not advance PC — keypad_enter_pressed handler will advance it
+        return  # keypad_enter_pressed handler will advance PC
     elif ir_val == 0xED: # INP 2 (Network) — read from network buffer or wait
         if len(network_rx_buffer) > 0:
             cpu_state["AC"] = network_rx_buffer.pop(0) & 0xFF
+            cpu_state["zero_flag"] = (cpu_state["AC"] == 0)
             socketio.emit('update_nc_buffer_ui', {'count': len(network_rx_buffer)})
             active_comps.extend(["block-ac"])
         else:
-            # Buffer empty — halt and wait for a LAN packet
             cpu_waiting_for_input = True
             active_in_port = 2
             cpu_state["mode"] = "WAITING FOR INPUT (NETWORK)"
@@ -373,13 +416,13 @@ def _do_step():
             broadcast_memory()
             socketio.emit('timm-tick', format_cpu_response())
             return
-    elif ir_val == 0xE4: # OUT 1 — Display (Accumulator → Screen)
+    elif ir_val == 0xE4: # OUT 1 — Display
         execute_out_instruction(1, cpu_state["AC"])
         active_comps.extend(["block-ac"])
-    elif ir_val == 0xEB: # OUT 2 — Printer (Accumulator → Printer buffer)
+    elif ir_val == 0xEB: # OUT 2 — Printer
         execute_out_instruction(2, cpu_state["AC"])
         active_comps.extend(["block-ac"])
-    elif ir_val == 0xEC: # OUT 3 — Network (Accumulator → LAN broadcast)
+    elif ir_val == 0xEC: # OUT 3 — Network
         execute_out_instruction(3, cpu_state["AC"])
         active_comps.extend(["block-ac"])
 
@@ -387,12 +430,14 @@ def _do_step():
     cpu_state["cycles"] += cycle_cost
     cpu_state["clock_cycles_remaining"] = cycle_cost
 
-    final_t_state = 3 if cpu_state["MPO_decision"] else 5
+    # CAR: 5-bit string — bit[4]=MSB (mode), bits[3:0]=T-state count
+    # Normal: final T-state = 5 (T1..T5 = fetch+decode+execute)
+    # Bypass:  final T-state = 3 (T1..T3, MBR stage skipped)
+    final_t_state = 3 if bypass_eligible else 5
     cpu_state["CAR"] = f"{car_msb}{final_t_state:04b}"
     cpu_state["active_path"] = active_wires
     cpu_state["active_components"] = active_comps
 
-    # FIX: Always broadcast memory after every step so RAM display stays current
     broadcast_memory()
     socketio.emit('timm-tick', format_cpu_response())
 
@@ -436,12 +481,21 @@ def stop_auto_run():
 @app.route('/reset', methods=['GET'])
 def reset_cpu():
     global cpu_state, keep_running, cpu_waiting_for_input, active_in_port
+    global printer_buffer, printer_has_jobs, network_rx_buffer, network_logs
+    global temporal_bypass_manual_enabled
     keep_running = False
     cpu_waiting_for_input = False
     active_in_port = 0
+    # Clear all peripheral buffers on cold boot
+    printer_buffer = []
+    printer_has_jobs = False
+    network_rx_buffer = []
+    network_logs = []
+    # temporal_bypass_manual_enabled is NOT reset — it's a user preference
     cpu_state.update({
         "PC": 0, "AC": 0, "IR": 0, "CAR": "00000", "cycles": 0,
         "clock_cycles_remaining": 0,
+        "zero_flag": False,
         "mode": "IDLE", "MPO_decision": False, "THB": {},
         "is_halted": False, "fgi_flag": False, "input_buffer": 0,
         "active_path": [], "active_components": [],
@@ -461,6 +515,7 @@ def clear_cpu():
     cpu_state.update({
         "PC": 0, "AC": 0, "IR": 0, "CAR": "00000", "cycles": 0,
         "clock_cycles_remaining": 0,
+        "zero_flag": False,
         "mode": "IDLE", "MPO_decision": False, "THB": {},
         "is_halted": False, "fgi_flag": False, "input_buffer": 0,
         "active_path": [], "active_components": [],
@@ -486,6 +541,14 @@ def handle_speed_update(data):
         hz = float(data['speed'])
         if hz > 0: clock_delay = 1.0 / hz
     except: pass
+
+@socketio.on('set_temporal_bypass_manual')
+def handle_set_temporal_bypass(data):
+    global temporal_bypass_manual_enabled
+    temporal_bypass_manual_enabled = bool(data.get('enabled', True))
+    print(f"Temporal Bypass Manual Toggle → {'ENABLED' if temporal_bypass_manual_enabled else 'DISABLED'}")
+    # Push updated state so UI reflects immediately
+    socketio.emit('timm-tick', format_cpu_response())
 
 @socketio.on('toggle_clock')
 def handle_toggle(data):
@@ -552,6 +615,8 @@ def handle_save_to_ram():
     if not hard_disk_buffer:
         socketio.emit('hd_error', {'msg': 'No file loaded. Please load a file first.'})
         return
+    # Cold-load: zero out all 16 slots first so no ghost instructions remain
+    main_memory = [0] * 16
     for addr, content in hard_disk_buffer.items():
         if 0 <= addr <= 15:
             main_memory[addr] = assemble(content['text']) & 0xFF
@@ -564,8 +629,32 @@ def handle_edit_file():
     global loaded_file_path
     if loaded_file_path and os.path.exists(loaded_file_path):
         subprocess.Popen(['notepad.exe', loaded_file_path])
+        # Re-parse after a short delay so that when the user saves in Notepad
+        # and then clicks "Save to RAM", the buffer reflects the edited version.
+        # We do a best-effort re-parse immediately; the user should click
+        # "Load" again or "Save" after editing for a guaranteed sync.
+        # For a guaranteed sync we also listen for a 'hd_reload_after_edit' event below.
     else:
         socketio.emit('hd_error', {'msg': 'No file loaded to edit.'})
+
+@socketio.on('hd_reload_after_edit')
+def handle_reload_after_edit():
+    """Called by the frontend after the user closes Notepad to re-parse the file."""
+    global loaded_file_path, hard_disk_buffer
+    if loaded_file_path and os.path.exists(loaded_file_path):
+        if basic_tbt_assembler(loaded_file_path):
+            table_data = [
+                {'address': f"{addr:01X}", 'data': c['text'], 'hex': c['hex']}
+                for addr, c in sorted(hard_disk_buffer.items())
+            ]
+            socketio.emit('hd_file_loaded', {
+                'table': table_data,
+                'filename': os.path.basename(loaded_file_path)
+            })
+        else:
+            socketio.emit('hd_error', {'msg': 'Failed to re-parse the edited file.'})
+    else:
+        socketio.emit('hd_error', {'msg': 'No file path available for reload.'})
 
 # FIX: keypad_enter_pressed sets AC directly and advances PC past INP
 @socketio.on('keypad_enter_pressed')
@@ -655,7 +744,7 @@ if __name__ == '__main__':
         window = webview.create_window(
             'TIMM: 4-Bit Operational Core Simulator',
             'http://127.0.0.1:5000',
-            width=1631, height=913, resizable=False
+            width=1468, height=822, resizable=False
         )
         webview.start()
     except Exception as e:

@@ -266,6 +266,43 @@
             filter: brightness(1.1);
         }
 
+        /* --- MANUAL BYPASS TOGGLE --- */
+        .bypass-toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--text-dark);
+            user-select: none;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 22px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1;
+            border-radius: 22px;
+            transition: .3s;
+            border: 2px solid #94a3b8;
+        }
+        .toggle-slider:before {
+            position: absolute; content: "";
+            height: 14px; width: 14px; left: 2px; bottom: 2px;
+            background-color: white;
+            border-radius: 50%;
+            transition: .3s;
+        }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--bus-temporal); border-color: #b8734b; }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(22px); }
+        .bypass-label-on  { color: var(--bus-temporal); }
+        .bypass-label-off { color: var(--text-light); }
+
         /* --- BOTTOM CONTROLS --- */
         .simulator-bottom {
             background-color: rgba(255, 255, 255, 0.95);
@@ -437,15 +474,25 @@
                 <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
                     T-CYCLES: <span id="ui-cycles" style="color: #3b7c97; font-size: 18px;">0</span>
                 </span>
-                <!-- FIX: Clock cycles per instruction display -->
+                <!-- Clock cycles per instruction display -->
                 <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
                     LAST COST: <span id="ui-clk-cost" style="color: #d28a5e; font-size: 18px;">—</span>
                 </span>
+                <!-- Zero flag live indicator -->
+                <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
+                    Z-FLAG: <span id="ui-zflag" style="font-size: 15px; color: var(--text-light);">0</span>
+                </span>
+                <!-- Manual Temporal Bypass Toggle -->
+                <div class="bypass-toggle-wrap" title="Enable or disable Temporal Bypass mode for A/B comparison">
+                    <span id="bypass-label" class="bypass-label-on">BYPASS</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="bypass-toggle" checked onchange="onBypassToggle(this)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
                 <button class="btn btn-primary" id="btn-step" onclick="executeStep()">Step Clock</button>
                 <button class="btn" id="btn-run" onclick="startAutoRun()">Auto-Run</button>
-                <!-- FIX: Stop button -->
                 <button class="btn" id="btn-stop" onclick="stopAutoRun()" style="display:none; color:#c95c5a; border-color:#c95c5a;">⏹ Stop</button>
-                <!-- FIX: Clear CPU button (registers only, RAM untouched) -->
                 <button class="btn" onclick="fetch('/clear_cpu').then(r=>r.json()).then(updateVisualization)" style="color:#7db18b; border-color:#7db18b;">Clear CPU</button>
                 <button class="btn" onclick="resetCore()" style="color: #c95c5a; border-color: #c95c5a;">Reset Core</button>
             </div>
@@ -467,22 +514,30 @@
     window.addEventListener('resize', scaleSchematic);
     scaleSchematic();
 
-    // FIX: Connect via WebSocket to receive live updates
     const socket = io();
 
     let state = {
         PC: "", AC: "", IR: "", CAR: "00000", current_instruction: "", next_instruction: "",
         mode: "IDLE", active_path: [], active_components: [],
         THB: {}, MPO_decision: false, cycles: 0, clock_cycles_remaining: 0,
-        is_halted: false, temporal_mode_active: false, temporal_mode_instruction: ""
+        zero_flag: false, is_halted: false,
+        temporal_mode_active: false, temporal_mode_instruction: "",
+        temporal_bypass_manual_enabled: true
     };
 
     let autoRunning = false;
 
-    // FIX: Listen to timm-tick socket event for live register/RAM updates
+    // --- MANUAL BYPASS TOGGLE ---
+    function onBypassToggle(checkbox) {
+        const enabled = checkbox.checked;
+        socket.emit('set_temporal_bypass_manual', { enabled: enabled });
+        const label = document.getElementById('bypass-label');
+        label.textContent = enabled ? 'BYPASS' : 'NO BYPASS';
+        label.className = enabled ? 'bypass-label-on' : 'bypass-label-off';
+    }
+
     socket.on('timm-tick', function(newState) {
         updateVisualization(newState);
-        // FIX: Also update RAM display from the payload
         if (newState.memory_bin && newState.memory_mnem && newState.memory_hex) {
             socket.emit('_relay_memory', {
                 memory_bin: newState.memory_bin,
@@ -490,9 +545,16 @@
                 memory_hex: newState.memory_hex
             });
         }
+        // Sync toggle state if backend state differs (e.g. on reconnect)
+        const toggleEl = document.getElementById('bypass-toggle');
+        if (typeof newState.temporal_bypass_manual_enabled === 'boolean') {
+            toggleEl.checked = newState.temporal_bypass_manual_enabled;
+            const label = document.getElementById('bypass-label');
+            label.textContent = newState.temporal_bypass_manual_enabled ? 'BYPASS' : 'NO BYPASS';
+            label.className = newState.temporal_bypass_manual_enabled ? 'bypass-label-on' : 'bypass-label-off';
+        }
     });
 
-    // FIX: Stop button appears on auto-run, hides on stop/halt
     socket.on('execution_stopped', function(data) {
         autoRunning = false;
         document.getElementById('btn-run').style.display = '';
@@ -540,21 +602,40 @@
     function updateVisualization(newState) {
         state = newState;
 
-        // FIX: Update registers with correct values every tick
+        // Registers
         document.getElementById("reg-pc").innerText = state.PC || "0";
         document.getElementById("reg-ac").innerText = state.AC || "00";
         document.getElementById("reg-ir").innerText = state.IR || "00";
-        document.getElementById("reg-car").innerText = state.CAR || "00000";
+
+        // CAR: display full 5-bit string; colour MSB to show mode clearly
+        const carVal = state.CAR || "00000";
+        const carMsb = carVal[0];
+        const carBody = carVal.slice(1);
+        document.getElementById("reg-car").innerHTML =
+            `<span style="color:${carMsb==='1'?'#ff9900':'#aaaaaa'};font-weight:900;">${carMsb}</span>${carBody}`;
+
         document.getElementById("reg-inst").innerText = state.current_instruction || "";
         document.getElementById("ui-cycles").innerText = state.cycles || "0";
 
-        // FIX: Display clock cycles cost per instruction
+        // Last cost display
         const costEl = document.getElementById("ui-clk-cost");
         if (state.clock_cycles_remaining > 0) {
-            costEl.innerText = state.clock_cycles_remaining + (state.MPO_decision ? " (BYPASS)" : "");
+            costEl.innerText = state.clock_cycles_remaining + (state.MPO_decision ? " ⚡BYPASS" : "");
         }
 
-        // FIX: Temporal mode popup/banner — show when active, hide when not
+        // Zero flag live display
+        const zEl = document.getElementById("ui-zflag");
+        if (state.zero_flag) {
+            zEl.innerText = "1";
+            zEl.style.color = "var(--bus-temporal)";
+            zEl.style.fontWeight = "900";
+        } else {
+            zEl.innerText = "0";
+            zEl.style.color = "var(--text-light)";
+            zEl.style.fontWeight = "700";
+        }
+
+        // Temporal banner
         const banner = document.getElementById('temporal-banner');
         if (state.temporal_mode_active) {
             document.getElementById('temporal-instruction-label').innerText = state.temporal_mode_instruction || "";
@@ -574,13 +655,12 @@
             modeLabel.style.borderColor = "#c95c5a";
             modeLabel.style.color = "#c95c5a";
             modeLabel.style.background = "#fff0f0";
-            // FIX: Show Stop button state when halted
             if (autoRunning) {
                 autoRunning = false;
                 document.getElementById('btn-run').style.display = '';
                 document.getElementById('btn-stop').style.display = 'none';
             }
-        } else if (state.mode === "WAITING FOR INPUT") {
+        } else if (state.mode && state.mode.startsWith("WAITING")) {
             modeLabel.style.borderColor = "#d28a5e";
             modeLabel.style.color = "#d28a5e";
             modeLabel.style.background = "#fff7ed";
@@ -628,52 +708,67 @@
         let content = "";
 
         if (component === "CAR") {
-            const msb = state.CAR ? state.CAR[0] : "0";
-            const source = msb === "1" ? "Temporal History Buffer (THB)" : "System Memory (RAM)";
-            // FIX: Explain Normal vs Temporal mode in popup
-            content += `<div style='font-weight:800; margin-bottom:10px;'>Control Status:</div>
-                        <div style='background:#f0f7ff; padding:12px; border-radius:6px; border:1px solid #d0e3ff;'>
-                            <b>MSB:</b> ${msb}<br>
-                            <b>Source:</b> <span style="color:var(--ic-car)">${source}</span><br>
-                            <b>State:</b> <span style="color:${msb==='1'?'var(--bus-temporal)':'var(--bus-data)'}">
-                                ${msb==='1' ? 'TEMPORAL BYPASS (4 cycles)' : 'NORMAL FETCH (6 cycles)'}
-                            </span>
+            const car = state.CAR || "00000";
+            const msb = car[0];
+            const tBits = car.slice(1);
+            const source = msb === "1" ? "Temporal History Buffer (THB)" : "System Memory (RAM / MBR)";
+            const manualOff = !state.temporal_bypass_manual_enabled;
+            content += `<div style='font-weight:800; margin-bottom:10px;'>Control Address Register (5-bit):</div>
+                        <div style='background:#f0f7ff; padding:12px; border-radius:6px; border:1px solid #d0e3ff; font-family:monospace; font-size:18px; text-align:center; letter-spacing:4px; margin-bottom:10px;'>
+                            <span style="color:${msb==='1'?'#ff9900':'#aaaaaa'}; font-weight:900;">${msb}</span><span style="color:#3b7c97;">${tBits}</span>
+                        </div>
+                        <div style='background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0; font-size:13px;'>
+                            <b>MSB [4]:</b> <span style="color:${msb==='1'?'var(--bus-temporal)':'var(--bus-data)'};">${msb==='1'?'1 → TEMPORAL BYPASS':'0 → NORMAL FETCH'}</span><br>
+                            <b>T-State [3:0]:</b> ${tBits} (decimal ${parseInt(tBits,2)})<br>
+                            <b>Operand source:</b> <span style="color:var(--ic-car);">${source}</span><br>
+                            <b>Manual toggle:</b> <span style="color:${manualOff?'#c95c5a':'#4caf50'};">${manualOff?'DISABLED (comparison mode)':'ENABLED'}</span>
                         </div>
                         <div style='margin-top:10px; font-size:12px; color:var(--text-light);'>
-                            <b>NORMAL MODE:</b> CPU fetches operand from RAM each cycle (6 T-states).<br>
-                            <b>TEMPORAL BYPASS:</b> MPO detects repeated memory access (≥3 times) and routes
-                            operand directly from Temporal History Buffer, skipping RAM (4 T-states).
+                            <b>NORMAL MODE (MSB=0):</b> Operand fetched from RAM via MBR — 6 T-states.<br>
+                            <b>TEMPORAL BYPASS (MSB=1):</b> MPO detects ≥3 repeated memory-ref signatures; THB feeds operand directly, skipping MBR — 4 T-states.
                         </div>`;
         }
         else if (component === "THB") {
-            content += "<div style='font-weight:800; margin-bottom:10px; color:var(--text-dark);'>History Buffer:</div><table><tr><th>Opcode</th><th>Cycles</th><th>Freq</th></tr>";
+            content += "<div style='font-weight:800; margin-bottom:10px; color:var(--text-dark);'>Temporal History Buffer — Instruction Signatures:</div><table><tr><th>Signature</th><th>T-Cost</th><th>Count</th><th>Status</th></tr>";
             if (state.THB && Object.keys(state.THB).length > 0) {
-                for (const [opcode, data] of Object.entries(state.THB)) {
-                    const isTemporal = data.cycles === 4;
-                    content += `<tr><td>${opcode}</td><td style="color:${isTemporal?'var(--bus-temporal)':'inherit'}">${data.cycles}${isTemporal?' ⚡':''}</td><td>${data.count}</td></tr>`;
+                for (const [sig, data] of Object.entries(state.THB)) {
+                    const isBypass = data.cycles === 4;
+                    const qualifies = data.count >= 3;
+                    const statusStr = isBypass ? '⚡ BYPASSED' : (qualifies ? '⏳ ELIGIBLE' : `${data.count}/3`);
+                    content += `<tr>
+                        <td>${sig}</td>
+                        <td style="color:${isBypass?'var(--bus-temporal)':'inherit'}">${data.cycles}${isBypass?' ⚡':''}</td>
+                        <td style="color:${qualifies?'var(--bus-temporal)':'inherit'}; font-weight:900;">${data.count}</td>
+                        <td style="color:${isBypass?'var(--bus-temporal)':qualifies?'#d28a5e':'var(--text-light)'};">${statusStr}</td>
+                    </tr>`;
                 }
                 content += "</table>";
             } else {
-                content += "</table><p style='color:var(--text-light); margin-top:15px; font-weight:600;'>Buffer is currently empty.</p>";
+                content += "</table><p style='color:var(--text-light); margin-top:15px; font-weight:600;'>Buffer is currently empty — execute instructions to populate.</p>";
             }
         }
         else if (component === "MPO") {
-            // FIX: Describe Normal vs Temporal clearly
             let statusColor = state.MPO_decision ? "var(--bus-temporal)" : "var(--text-light)";
             content += `<div style="margin-bottom:8px; font-weight:800;">Status: <b style="color:${statusColor}">${state.MPO_decision ? '⚡ BYPASS ENGAGED' : '🔍 SCANNING...'}</b></div>
                 <div style="background:#f8fafc; padding:12px; border:1px solid #e2e8f0; border-radius:8px; font-family:monospace; font-size:13px;">
                     <b>Current:</b> <span style="color:var(--bus-control)">${state.current_instruction || 'WAITING'}</span><br>
-                    <b>Next:</b> <span style="color:var(--bus-control)">${state.next_instruction || 'WAITING'}</span>
+                    <b>Next:</b> <span style="color:var(--bus-control)">${state.next_instruction || 'WAITING'}</span><br>
+                    <b>Zero Flag:</b> <span style="color:${state.zero_flag?'var(--bus-temporal)':'var(--text-light)'}">${state.zero_flag?'1 (AC=0)':'0 (AC≠0)'}</span>
                 </div>
                 <div style="margin-top:10px; font-size:12px; color:var(--text-light);">
-                    MPO monitors instruction frequency. When a memory-referencing instruction runs ≥3 times,
-                    it signals the CAR to activate Temporal Bypass, reducing cost from 6→4 T-states.
+                    MPO monitors instruction signatures in the THB. When a memory-referencing instruction accumulates ≥3 hits, it flips the CAR MSB to 1, engaging Temporal Bypass and reducing cost from 6→4 T-states. Use the Manual Bypass toggle to disable this for A/B comparison.
                 </div>`;
         }
         else if (component === "ALU") {
             content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Current Operation:</div>
                 <div style="font-family:monospace; background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:8px; font-weight:bold; font-size:15px; color:var(--bus-control);">${state.current_instruction || 'IDLE'}</div>
-                <div style="margin-top:10px; font-size:12px; color:var(--text-light);">AC = ${state.AC || '00'} (hex)</div>`;
+                <div style="margin-top:10px; font-size:13px; color:var(--text-dark);">
+                    AC = <b style="color:var(--bus-control);">${state.AC || '00'}</b> (hex) &nbsp;|&nbsp;
+                    Z-Flag = <b style="color:${state.zero_flag?'var(--bus-temporal)':'var(--text-light)'};">${state.zero_flag?'1':'0'}</b>
+                </div>
+                <div style="margin-top:8px; font-size:12px; color:var(--text-light);">
+                    All ALU ops (ADD, SUB, AND, OR, INC, DEC, SHL, SHR) compute 8-bit results (&amp; 0xFF) and update the Zero Flag. JNZ reads this flag — if Z=0 (AC≠0), it jumps.
+                </div>`;
         }
         else {
             let val = state[component] || "";

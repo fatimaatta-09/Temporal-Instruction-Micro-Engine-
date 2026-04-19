@@ -44,6 +44,12 @@
       border-color: #d28a5e;
     }
 
+    /* Zero flag indication — subtle teal glow when AC=0 is on display */
+    .peripheral-container.zero-flag-active {
+      box-shadow: 0 0 12px rgba(45, 212, 191, 0.4);
+      border-color: #2dd4bf;
+    }
+
     .main-title {
       font-family: 'Courier New', Courier, monospace;
       margin: 0;
@@ -342,23 +348,29 @@
     // 1. CPU triggers an OUT instruction
     socket.on('display_update', (data) => {
       accumulatorValue = data.value;
+      // Zero flag glow: if displayed value is 0, add teal glow
+      if (data.value === 0) {
+        container.classList.add('zero-flag-active');
+      } else {
+        container.classList.remove('zero-flag-active');
+      }
       renderDisplay();
     });
 
     // 2. CPU triggers an IN instruction (Halts and waits)
     socket.on('request_input', () => {
       isWaitingForInput = true;
-      inputBuffer = ""; // Reset buffer
-      container.classList.add('waiting-for-input'); // Make it glow!
-      renderDisplay(); // Will blank out slightly if buffer is empty
+      inputBuffer = "";
+      container.classList.add('waiting-for-input');
+      container.classList.remove('zero-flag-active');
+      renderDisplay();
     });
 
     // 3. CPU accepts the input and resumes clock
     socket.on('input_accepted', () => {
       isWaitingForInput = false;
       inputBuffer = "";
-      container.classList.remove('waiting-for-input'); // Remove glow
-      // We don't render display here yet; we wait for the CPU to specifically call OUT if it wants to show the new value.
+      container.classList.remove('waiting-for-input');
     });
 
     // Initial render

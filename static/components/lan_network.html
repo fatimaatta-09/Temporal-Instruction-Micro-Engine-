@@ -598,11 +598,14 @@
 
     // 1. Update Network Buffer UI (When PC sends data, or CPU reads data)
     socket.on('update_nc_buffer_ui', (data) => {
-        bufferBadge.innerText = data.count;
-        if(data.last_data !== undefined) {
+        bufferBadge.innerText = data.count !== undefined ? data.count : bufferBadge.innerText;
+        if (data.last_data !== undefined) {
             dataScreenIn.innerText = data.last_data;
-            document.getElementById(`input-0`).placeholder = data.last_data;
-            document.getElementById(`input-1`).placeholder = data.last_data;
+        }
+        // If buffer emptied (CPU consumed it), reset placeholder text
+        if (data.count === 0) {
+            document.getElementById('input-0').placeholder = ' ';
+            document.getElementById('input-1').placeholder = ' ';
         }
     });
 
@@ -618,7 +621,9 @@
             const packets = [];
             for (let i = 0; i < 3; i++) {
                 const p = document.createElement('div');
-                p.className = 'data-flow data-flow-broadcast'; // Purple packets!
+                p.className = 'data-flow data-flow-broadcast';
+                p.style.left = path[0].x + 'px';
+                p.style.top = path[0].y + 'px';
                 p.style.opacity = '0'; 
                 lanModule.appendChild(p);
                 packets.push(p);
@@ -636,11 +641,19 @@
         spawnBroadcast(reversePc0);
         spawnBroadcast(reversePc1);
         
-        // Flash screens with the data the CPU just broadcasted
+        // Flash screens with broadcast payload, then clear after 3s
         setTimeout(() => {
-            document.getElementById(`input-0`).value = data.payload;
-            document.getElementById(`input-1`).value = data.payload;
+            document.getElementById('input-0').value = data.payload;
+            document.getElementById('input-1').value = data.payload;
         }, 1500);
+
+        // Auto-clear the broadcast echo after 3s so PCs are ready for next input
+        setTimeout(() => {
+            const i0 = document.getElementById('input-0');
+            const i1 = document.getElementById('input-1');
+            if (i0.value == data.payload) i0.value = '';
+            if (i1.value == data.payload) i1.value = '';
+        }, 3500);
     });
 
   </script>

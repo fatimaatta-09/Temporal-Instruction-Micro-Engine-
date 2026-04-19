@@ -273,11 +273,11 @@
       }
     }
 
-    // FIX: Highlight a memory cell briefly when it changes during execution
-    function flashCell(i) {
+    // FIX: Flash colours — green for normal change, amber for zero-result write
+    function flashCell(i, isZero) {
       const input = document.getElementById(`mem-input-${i}`);
       if (!input) return;
-      input.style.background = '#e0ffe0';
+      input.style.background = isZero ? '#fff3e0' : '#e0ffe0';
       setTimeout(() => { input.style.background = ''; }, 400);
     }
 
@@ -291,9 +291,11 @@
       cachedMemoryBin  = state.memory_bin  || cachedMemoryBin;
       cachedMemoryMnem = state.memory_mnem || cachedMemoryMnem;
       cachedMemoryHex  = state.memory_hex  || cachedMemoryHex;
-      // Flash cells that changed
+      // Flash cells that changed — amber if value is zero (all bits off)
       for (let i = 0; i < 16; i++) {
-        if (cachedMemoryBin[i] !== oldBin[i]) flashCell(i);
+        if (cachedMemoryBin[i] !== oldBin[i]) {
+          flashCell(i, cachedMemoryBin[i] === '00000000');
+        }
       }
       refreshMemoryDisplay();
     });
