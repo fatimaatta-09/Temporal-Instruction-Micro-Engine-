@@ -61,14 +61,19 @@ cpu_waiting_for_input = False
 active_in_port = 0
 accumulator = 0
 
-# Manual bypass toggle — allows user to force-disable temporal mode for comparison
-temporal_bypass_manual_enabled = True  # True = normal hardware behaviour; False = user-disabled bypass
+# Manual bypass toggle — allows user to force-disable temporal mode for A/B comparison
+temporal_bypass_manual_enabled = True  # True = hardware behaviour active; False = forced Normal mode
 
-# CAR is 5-bit: MSB=0 → Normal (fetch from RAM, 6 cycles); MSB=1 → Temporal Bypass (skip MBR, 4 cycles)
+# CAR is 5-bit: MSB=0 → Normal (fetch from RAM via MBR, 6 cycles)
+#               MSB=1 → Temporal Bypass (MBR held in high-Z, data direct RAM→ALU, 4 cycles)
+# THB: 4×8 CAM — max 4 unique memory-reference signatures; flushes on JMP or Z-flag=1
 cpu_state = {
     "PC": 0, "AC": 0, "IR": 0, "CAR": "00000", "cycles": 0,
     "clock_cycles_remaining": 0,
-    "zero_flag": False,          # ALU zero flag — drives JNZ correctly
+    "zero_flag": False,          # ALU Z-flag — set when ALU result == 0; drives JNZ; triggers THB flush
+    "carry_flag": False,         # ALU C-flag — set on 8-bit overflow
+    "neg_flag": False,           # ALU N-flag — set when MSB of result == 1
+    "cycles_saved": 0,           # Cumulative clock cycles saved by Temporal Bypass (2 per bypassed instr)
     "mode": "IDLE", "MPO_decision": False, "THB": {},
     "is_halted": False, "fgi_flag": False, "input_buffer": 0,
     "active_path": [], "active_components": [],
@@ -132,6 +137,8 @@ def assemble(text):
     impl_map = {
         "NOP": 0x00, "HLT": 0xF0, "CLR": 0xE0, "SHL": 0xE1, "SHR": 0xE2,
         "ION": 0xE5, "IOF": 0xE6,
+        # Bare INC/DEC (accumulator implied, operand nibble = 0)
+        "INC": 0xC0, "DEC": 0xD0,
         # Port-1 shortcuts (backward compat)
         "INP": 0xE3, "OUT": 0xE4,
         # Port-specific OUT opcodes: OUT 1=0xE4, OUT 2=0xEB, OUT 3=0xEC
@@ -228,6 +235,9 @@ def format_cpu_response():
         "cycles": cpu_state["cycles"],
         "clock_cycles_remaining": cpu_state["clock_cycles_remaining"],
         "zero_flag": cpu_state["zero_flag"],
+        "carry_flag": cpu_state["carry_flag"],
+        "neg_flag": cpu_state["neg_flag"],
+        "cycles_saved": cpu_state["cycles_saved"],
         "mode": cpu_state["mode"],
         "temporal_mode_active": cpu_state["temporal_mode_active"],
         "temporal_mode_instruction": cpu_state["temporal_mode_instruction"],
@@ -261,54 +271,94 @@ def execute_out_instruction(port, ac_value):
         socketio.emit('network_broadcast_rx', {'payload': ac_value, 'log': log_entry})
 
 def _do_step():
-    """Core single-instruction step. Called by /step and auto_run_loop."""
-    global cpu_state, main_memory, active_in_port, cpu_waiting_for_input, temporal_bypass_manual_enabled
+    """
+    Core single-instruction step implementing the TIME architecture spec:
+
+    ALL instructions begin with the same 3-cycle fetch/decode (T0, T1, T2):
+      T0: MAR ← PC
+      T1: IR  ← M[MAR],  PC ← PC + 1
+      T2: Decode + MPO queries THB
+
+    Then diverge into Normal (6 cycles) or Temporal Bypass (4 cycles):
+
+    Normal (MPO_match=0, CAR MSB=0):
+      T3: MAR ← IR[3:0]
+      T4: MBR ← M[MAR]          ← THE BOTTLENECK (eliminated by bypass)
+      T5: AC  ← AC op MBR, SC←0
+
+    Temporal Bypass (MPO_match=1, CAR MSB=1) — STA EXCLUDED:
+      T3: AC  ← AC op M[operand]  (MBR held in high-Z, direct RAM→ALU)
+      T4: SC ← 0  (bypassed, SC resets early)
+      T5: (bypassed — CPU already on next fetch)
+
+    THB eviction policy (hardware-triggered flush):
+      • JMP decoded → CLR pulse to all THB D/T flip-flops → immediate full flush
+      • Z-flag transitions to 1 → loop ended, flush THB
+
+    THB capacity: maximum 4 unique memory-reference signatures (4×8 CAM).
+    STA always uses Normal path (memory write requires MBR staging).
+    """
+    global cpu_state, main_memory, active_in_port, cpu_waiting_for_input
+    global temporal_bypass_manual_enabled
 
     if cpu_state["is_halted"] or cpu_waiting_for_input:
         return
 
-    pc_val = cpu_state["PC"]
-    ir_val = main_memory[pc_val]
+    pc_val  = cpu_state["PC"]
+    ir_val  = main_memory[pc_val]
     cpu_state["IR"] = ir_val
-    opcode = (ir_val >> 4) & 0xF
-    addr = ir_val & 0xF
-    actual_addr = addr
-    if addr == 0xF: actual_addr = main_memory[0xF] & 0xF
+    opcode  = (ir_val >> 4) & 0xF
+    operand = ir_val & 0xF
+    # Register-indirect: if operand nibble == 0xF, use M[0xF] as actual address
+    actual_addr = (main_memory[0xF] & 0xF) if operand == 0xF else operand
 
-    ir_hex = disassemble(ir_val)
+    ir_sig = disassemble(ir_val)   # 8-bit IR signature (e.g. "ADD 3", "LDA F")
 
-    # --- THB: Track unique instruction signatures ---
-    # Each entry keyed by the full disassembled instruction string (the "signature")
-    if ir_hex not in cpu_state["THB"]:
-        cpu_state["THB"][ir_hex] = {"count": 0, "cycles": 6}
-    cpu_state["THB"][ir_hex]["count"] += 1
-    count = cpu_state["THB"][ir_hex]["count"]
+    # --- T2: Branch Decision + Pattern Recognition ---
+    # Memory-Reference instructions (high-latency) that the THB selectively logs.
+    # STA is memory-reference but its bypass is architecturally prohibited (write needs MBR).
+    is_mem_ref_for_thb = opcode in [1, 2, 3, 4, 9, 0xA]   # LDA,STA,ADD,SUB,AND,OR
+    is_bypass_eligible_op = opcode in [1, 3, 4, 9, 0xA]    # LDA,ADD,SUB,AND,OR (NOT STA)
 
-    is_mem_ref = opcode in [1, 2, 3, 4, 9, 0xA]
+    # THB: update only for memory-reference instructions; cap at 4 unique signatures
+    if is_mem_ref_for_thb:
+        if ir_sig not in cpu_state["THB"]:
+            if len(cpu_state["THB"]) < 4:          # 4-entry CAM capacity limit
+                cpu_state["THB"][ir_sig] = {"count": 0, "cycles": 6}
+            # If THB is full and this is a new sig → no entry, no bypass for this sig
+        if ir_sig in cpu_state["THB"]:
+            cpu_state["THB"][ir_sig]["count"] += 1
 
-    # --- CAR MSB LOGIC ---
-    # MSB=0 → Normal mode: data flows through MBR from RAM (6 T-states)
-    # MSB=1 → Temporal Bypass: MBR is bypassed, THB feeds operand directly (4 T-states)
-    # Only engage bypass if: instruction is memory-referencing, seen ≥3 times,
-    # AND the manual toggle has not been disabled by the user.
-    bypass_eligible = is_mem_ref and count >= 3 and temporal_bypass_manual_enabled
+    # --- MPO: Rule-of-Three threshold comparator ---
+    thb_count = cpu_state["THB"].get(ir_sig, {}).get("count", 0)
+    bypass_eligible = (
+        is_bypass_eligible_op           # op supports bypass
+        and thb_count >= 3              # frequency threshold met (≥3 hits)
+        and temporal_bypass_manual_enabled  # user has not disabled bypass
+    )
 
-    car_msb = "1" if bypass_eligible else "0"
-    cycle_cost = 4 if bypass_eligible else (6 if is_mem_ref else 4)
+    # --- CAR MSB logic ---
+    # MSB=0 → Normal path (MBR staging, 6 T-states total)
+    # MSB=1 → Temporal Bypass (MBR high-Z, direct RAM→ALU, 4 T-states total)
+    # Non-memory-reference instructions always cost 4 T-states (T0..T3, no MBR stage).
+    car_msb    = "1" if bypass_eligible else "0"
+    cycle_cost = 4 if bypass_eligible else (6 if is_mem_ref_for_thb else 4)
 
     cpu_state["MPO_decision"] = bypass_eligible
 
     if bypass_eligible:
         cpu_state["mode"] = "TEMPORAL BYPASS"
         cpu_state["temporal_mode_active"] = True
-        cpu_state["temporal_mode_instruction"] = ir_hex
-        cpu_state["THB"][ir_hex]["cycles"] = 4
+        cpu_state["temporal_mode_instruction"] = ir_sig
+        cpu_state["THB"][ir_sig]["cycles"] = 4
+        cpu_state["cycles_saved"] += 2   # 2 cycles saved per bypassed instruction (T4+T5 eliminated)
     else:
-        cpu_state["mode"] = "NORMAL EXECUTION"
-        # Keep temporal_mode_active True if it was set previously (sticky banner)
-        # but update the label only if currently engaged
-        if not cpu_state["temporal_mode_active"]:
-            cpu_state["temporal_mode_instruction"] = ""
+        # Only clear temporal_mode_active banner when we're NOT in a bypass AND it was active
+        if cpu_state["temporal_mode_active"] and not bypass_eligible:
+            cpu_state["mode"] = "NORMAL EXECUTION"
+            # Don't clear temporal_mode_active yet — let THB flush events do it
+        else:
+            cpu_state["mode"] = "NORMAL EXECUTION"
 
     active_wires = ["wire-pc-data", "wire-ir-data", "wire-pc-addr"]
     active_comps = ["block-pc", "block-ir"]
@@ -319,78 +369,128 @@ def _do_step():
 
     next_pc = (pc_val + 1) & 0xF
 
-    # --- ALU OPERATIONS — 8-bit integer math, Zero Flag updated ---
-    if opcode == 1:      # LDA — load AC from RAM; not an ALU compute, but sets Z
-        cpu_state["AC"] = main_memory[actual_addr] & 0xFF
-        cpu_state["zero_flag"] = (cpu_state["AC"] == 0)
+    # ============================================================
+    # EXECUTE PHASE — with ALU flag updates (Z, C, N)
+    # ============================================================
+
+    def set_flags(result_raw, result_8bit):
+        """Update Z, C, N flags from a raw (pre-mask) ALU result."""
+        cpu_state["zero_flag"]  = (result_8bit == 0)
+        cpu_state["carry_flag"] = (result_raw > 0xFF) or (result_raw < 0)
+        cpu_state["neg_flag"]   = bool(result_8bit & 0x80)
+
+    if opcode == 1:      # LDA — load from RAM; bypass allowed
+        result = main_memory[actual_addr]
+        cpu_state["AC"] = result
+        set_flags(result, result)
         active_wires.extend(["wire-alu-data", "wire-ac-data"])
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 2:    # STA — write AC to RAM (no ALU, no flag change)
+
+    elif opcode == 2:    # STA — store AC to RAM; ALWAYS Normal path (no bypass)
+        # STA requires MBR staging for write; the report explicitly excludes it from bypass
         main_memory[actual_addr] = cpu_state["AC"]
+        # Override any bypass decision — STA cannot use bypass
+        bypass_eligible = False
+        car_msb = "0"
+        cycle_cost = 6
+        cpu_state["MPO_decision"] = False
+        # STA is excluded from bypass by is_bypass_eligible_op (opcode 2 not in set),
+        # so cycles_saved was never incremented for STA — no undo needed.
         active_wires.extend(["wire-ac-alu", "wire-alu-data"])
         active_comps.extend(["block-alu"])
-    elif opcode == 3:    # ADD — 8-bit addition, update Z
-        result = (cpu_state["AC"] + main_memory[actual_addr]) & 0xFF
+
+    elif opcode == 3:    # ADD — bypass allowed
+        raw = cpu_state["AC"] + main_memory[actual_addr]
+        result = raw & 0xFF
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(raw, result)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 4:    # SUB — 8-bit subtraction, update Z
-        result = (cpu_state["AC"] - main_memory[actual_addr]) & 0xFF
+
+    elif opcode == 4:    # SUB — bypass allowed
+        raw = cpu_state["AC"] - main_memory[actual_addr]
+        result = raw & 0xFF
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(raw, result)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 9:    # AND — bitwise AND, update Z
-        result = cpu_state["AC"] & main_memory[actual_addr] & 0xFF
+
+    elif opcode == 9:    # AND — bypass allowed
+        result = cpu_state["AC"] & main_memory[actual_addr]
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(result, result)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 0xA:  # OR — bitwise OR, update Z
-        result = (cpu_state["AC"] | main_memory[actual_addr]) & 0xFF
+
+    elif opcode == 0xA:  # OR — bypass allowed
+        result = cpu_state["AC"] | main_memory[actual_addr]
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(result, result)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 5:    # MVI — move immediate nibble into AC
-        cpu_state["AC"] = actual_addr & 0xFF
-        cpu_state["zero_flag"] = (cpu_state["AC"] == 0)
+
+    elif opcode == 5:    # MVI — immediate, single-cycle, not logged by THB
+        cpu_state["AC"] = actual_addr
+        set_flags(actual_addr, actual_addr)
         active_comps.extend(["block-ac"])
-    elif opcode == 6:    # ADI — add immediate
-        result = (cpu_state["AC"] + actual_addr) & 0xFF
+
+    elif opcode == 6:    # ADI — immediate, single-cycle
+        raw = cpu_state["AC"] + actual_addr
+        result = raw & 0xFF
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(raw, result)
         active_comps.extend(["block-alu", "block-ac"])
+
     elif opcode == 7:    # JMP — unconditional jump
+        # HARDWARE FLUSH: JMP decoded → CLR pulse → full THB eviction (zero-cycle)
         next_pc = actual_addr
-    elif opcode == 8:    # JNZ — jump if NOT zero (reads ALU zero_flag correctly)
+        cpu_state["THB"] = {}
+        cpu_state["temporal_mode_active"] = False
+        cpu_state["temporal_mode_instruction"] = ""
+        cpu_state["MPO_decision"] = False
+        print(f"JMP decoded → THB flushed (eviction policy)")
+
+    elif opcode == 8:    # JNZ — jump if NOT zero (reads ALU Z-flag)
         if not cpu_state["zero_flag"]:
             next_pc = actual_addr
-    elif opcode == 0xC:  # INC
-        result = (cpu_state["AC"] + 1) & 0xFF
+        # Note: if Z=1 here, THB flush happens below after flag is set
+
+    elif opcode == 0xC:  # INC — register-reference, not THB-logged
+        raw = cpu_state["AC"] + 1
+        result = raw & 0xFF
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(raw, result)
         active_comps.extend(["block-alu", "block-ac"])
-    elif opcode == 0xD:  # DEC
-        result = (cpu_state["AC"] - 1) & 0xFF
+
+    elif opcode == 0xD:  # DEC — register-reference
+        raw = cpu_state["AC"] - 1
+        result = raw & 0xFF
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(raw, result)
         active_comps.extend(["block-alu", "block-ac"])
+
+    elif opcode == 0xB:  # MOV — internal register copy (not THB-logged)
+        active_comps.extend(["block-ac"])
+
     elif ir_val == 0xE0: # CLR
         cpu_state["AC"] = 0
-        cpu_state["zero_flag"] = True
+        set_flags(0, 0)
         active_comps.extend(["block-ac"])
+
     elif ir_val == 0xE1: # SHL
-        result = (cpu_state["AC"] << 1) & 0xFF
+        raw = cpu_state["AC"] << 1
+        result = raw & 0xFF
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(raw, result)
         active_comps.extend(["block-alu", "block-ac"])
+
     elif ir_val == 0xE2: # SHR
-        result = (cpu_state["AC"] >> 1) & 0xFF
+        result = cpu_state["AC"] >> 1
         cpu_state["AC"] = result
-        cpu_state["zero_flag"] = (result == 0)
+        set_flags(result, result)
         active_comps.extend(["block-alu", "block-ac"])
+
     elif ir_val == 0xF0: # HLT
         cpu_state["is_halted"] = True
         cpu_state["mode"] = "SYSTEM HALTED"
-    elif ir_val == 0xE3: # INP 1 (Keypad) — halt and wait, do NOT advance PC
+
+    elif ir_val == 0xE3: # INP 1 (Keypad) — wait for input
         cpu_waiting_for_input = True
         active_in_port = 1
         cpu_state["mode"] = "WAITING FOR INPUT (KEYPAD)"
@@ -399,12 +499,16 @@ def _do_step():
         socketio.emit('request_input')
         broadcast_memory()
         socketio.emit('timm-tick', format_cpu_response())
-        return  # keypad_enter_pressed handler will advance PC
-    elif ir_val == 0xED: # INP 2 (Network) — read from network buffer or wait
+        return
+
+    elif ir_val == 0xED: # INP 2 (Network) — read from buffer or wait
         if len(network_rx_buffer) > 0:
-            cpu_state["AC"] = network_rx_buffer.pop(0) & 0xFF
-            cpu_state["zero_flag"] = (cpu_state["AC"] == 0)
+            val = network_rx_buffer.pop(0) & 0xFF
+            cpu_state["AC"] = val
+            set_flags(val, val)
             socketio.emit('update_nc_buffer_ui', {'count': len(network_rx_buffer)})
+            # Show the received value on the display immediately (same as keypad INP)
+            socketio.emit('display_update', {'value': val})
             active_comps.extend(["block-ac"])
         else:
             cpu_waiting_for_input = True
@@ -416,23 +520,43 @@ def _do_step():
             broadcast_memory()
             socketio.emit('timm-tick', format_cpu_response())
             return
+
     elif ir_val == 0xE4: # OUT 1 — Display
         execute_out_instruction(1, cpu_state["AC"])
         active_comps.extend(["block-ac"])
+
     elif ir_val == 0xEB: # OUT 2 — Printer
         execute_out_instruction(2, cpu_state["AC"])
         active_comps.extend(["block-ac"])
+
     elif ir_val == 0xEC: # OUT 3 — Network
         execute_out_instruction(3, cpu_state["AC"])
         active_comps.extend(["block-ac"])
 
+    # ============================================================
+    # POST-EXECUTE: Z-flag triggered THB flush (loop-end detection)
+    # Per report §2.6.1: when Z-flag transitions to 1, THB is flushed
+    # immediately — the loop has ended, optimization logs are cleared
+    # for the next workload.
+    # ============================================================
+    if cpu_state["zero_flag"] and opcode != 7:  # JMP already flushed
+        old_thb_size = len(cpu_state["THB"])
+        if old_thb_size > 0:
+            cpu_state["THB"] = {}
+            cpu_state["temporal_mode_active"] = False
+            cpu_state["temporal_mode_instruction"] = ""
+            cpu_state["MPO_decision"] = False
+            print(f"Z-flag=1 → THB flushed ({old_thb_size} entries cleared, loop ended)")
+
+    # ============================================================
+    # FINALIZE: advance PC, tally cycles, set CAR
+    # ============================================================
     cpu_state["PC"] = next_pc
     cpu_state["cycles"] += cycle_cost
     cpu_state["clock_cycles_remaining"] = cycle_cost
 
-    # CAR: 5-bit string — bit[4]=MSB (mode), bits[3:0]=T-state count
-    # Normal: final T-state = 5 (T1..T5 = fetch+decode+execute)
-    # Bypass:  final T-state = 3 (T1..T3, MBR stage skipped)
+    # CAR 5-bit: [MSB=mode][4-bit T-state]
+    # Normal final T-state = 5 (T0…T5); Bypass final T-state = 3 (T0…T3)
     final_t_state = 3 if bypass_eligible else 5
     cpu_state["CAR"] = f"{car_msb}{final_t_state:04b}"
     cpu_state["active_path"] = active_wires
@@ -495,7 +619,8 @@ def reset_cpu():
     cpu_state.update({
         "PC": 0, "AC": 0, "IR": 0, "CAR": "00000", "cycles": 0,
         "clock_cycles_remaining": 0,
-        "zero_flag": False,
+        "zero_flag": False, "carry_flag": False, "neg_flag": False,
+        "cycles_saved": 0,
         "mode": "IDLE", "MPO_decision": False, "THB": {},
         "is_halted": False, "fgi_flag": False, "input_buffer": 0,
         "active_path": [], "active_components": [],
@@ -515,7 +640,8 @@ def clear_cpu():
     cpu_state.update({
         "PC": 0, "AC": 0, "IR": 0, "CAR": "00000", "cycles": 0,
         "clock_cycles_remaining": 0,
-        "zero_flag": False,
+        "zero_flag": False, "carry_flag": False, "neg_flag": False,
+        "cycles_saved": 0,
         "mode": "IDLE", "MPO_decision": False, "THB": {},
         "is_halted": False, "fgi_flag": False, "input_buffer": 0,
         "active_path": [], "active_components": [],
@@ -656,28 +782,38 @@ def handle_reload_after_edit():
     else:
         socketio.emit('hd_error', {'msg': 'No file path available for reload.'})
 
-# FIX: keypad_enter_pressed sets AC directly and advances PC past INP
+# FIX: keypad_enter_pressed — sets AC, advances PC past INP, shows value on display
 @socketio.on('keypad_enter_pressed')
 def handle_keypad_enter(data):
     global cpu_waiting_for_input, accumulator, cpu_state, active_in_port
-    if cpu_waiting_for_input:  # Accept from keypad for any port-wait if no other source
-        try:
-            val = int(data['value']) & 0xFF
-            accumulator = val
-            cpu_state['AC'] = val
-            cpu_state['input_buffer'] = val
-            cpu_state['fgi_flag'] = True
-            cpu_waiting_for_input = False
-            active_in_port = 0
-            cpu_state['PC'] = (cpu_state['PC'] + 1) & 0xF
-            cpu_state['mode'] = 'NORMAL EXECUTION'
-            cpu_state['cycles'] += 4
-            cpu_state['clock_cycles_remaining'] = 4
-            socketio.emit('input_accepted')
-            broadcast_memory()
-            socketio.emit('timm-tick', format_cpu_response())
-        except Exception as e:
-            print(f"Keypad error: {e}")
+    if not cpu_waiting_for_input:
+        return
+    try:
+        val = int(data['value']) & 0xFF
+        accumulator = val
+        cpu_state['AC'] = val
+        cpu_state['input_buffer'] = val
+        cpu_state['fgi_flag'] = True
+        # Update ALU flags for the loaded value
+        cpu_state['zero_flag'] = (val == 0)
+        cpu_state['neg_flag'] = bool(val & 0x80)
+        cpu_state['carry_flag'] = False
+        cpu_waiting_for_input = False
+        active_in_port = 0
+        cpu_state['PC'] = (cpu_state['PC'] + 1) & 0xF
+        cpu_state['mode'] = 'NORMAL EXECUTION'
+        cpu_state['clock_cycles_remaining'] = 4
+        cpu_state['cycles'] += 4
+        # Emit input_accepted WITH the value so screen.html can render immediately
+        socketio.emit('input_accepted', {'value': val})
+        # Also emit display_update so the 7-segment shows the entered value right away
+        # (mirroring what OUT 1 would do — the user typed a number, they should see it)
+        socketio.emit('display_update', {'value': val})
+        broadcast_memory()
+        socketio.emit('timm-tick', format_cpu_response())
+        print(f"Keypad input accepted: {val} (0x{val:02X}) → AC, PC advanced to {cpu_state['PC']:X}")
+    except Exception as e:
+        print(f"Keypad error: {e}")
 
 @socketio.on('keyboard_interrupt')
 def handle_keyboard_interrupt(data):
@@ -711,11 +847,17 @@ def handle_pc_network_traffic(data):
         val = network_rx_buffer.pop(0)
         accumulator = val
         cpu_state['AC'] = val
+        cpu_state['zero_flag'] = (val == 0)
+        cpu_state['neg_flag'] = bool(val & 0x80)
+        cpu_state['carry_flag'] = False
         cpu_waiting_for_input = False
         active_in_port = 0
         cpu_state['PC'] = (cpu_state['PC'] + 1) & 0xF
         cpu_state['mode'] = 'NORMAL EXECUTION'
-        socketio.emit('input_accepted')
+        cpu_state['cycles'] += 4
+        cpu_state['clock_cycles_remaining'] = 4
+        socketio.emit('input_accepted', {'value': val})
+        socketio.emit('display_update', {'value': val})
         socketio.emit('update_nc_buffer_ui', {'count': len(network_rx_buffer)})
         socketio.emit('timm-tick', format_cpu_response())
 

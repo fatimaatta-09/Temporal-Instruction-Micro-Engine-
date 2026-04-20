@@ -474,17 +474,23 @@
                 <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
                     T-CYCLES: <span id="ui-cycles" style="color: #3b7c97; font-size: 18px;">0</span>
                 </span>
-                <!-- Clock cycles per instruction display -->
                 <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
                     LAST COST: <span id="ui-clk-cost" style="color: #d28a5e; font-size: 18px;">—</span>
                 </span>
-                <!-- Zero flag live indicator -->
-                <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;">
-                    Z-FLAG: <span id="ui-zflag" style="font-size: 15px; color: var(--text-light);">0</span>
+                <!-- Cycles Saved counter — the core metric from §6.5 of the report -->
+                <span style="font-family: 'Courier New', monospace; font-weight: 800; color: #333333; font-size:13px;"
+                      title="Total clock cycles eliminated by Temporal Bypass (2 saved per bypassed instruction)">
+                    SAVED: <span id="ui-cycles-saved" style="color: #7db18b; font-size: 18px;">0</span>
                 </span>
-                <!-- Manual Temporal Bypass Toggle -->
-                <div class="bypass-toggle-wrap" title="Enable or disable Temporal Bypass mode for A/B comparison">
-                    <span id="bypass-label" class="bypass-label-on">BYPASS</span>
+                <!-- ALU Flags row -->
+                <span style="font-family: 'Courier New', monospace; font-weight: 700; color: #888; font-size:12px;">
+                    Z:<span id="ui-zflag" style="font-size:13px; color:var(--text-light);">0</span>
+                    &nbsp;C:<span id="ui-cflag" style="font-size:13px; color:var(--text-light);">0</span>
+                    &nbsp;N:<span id="ui-nflag" style="font-size:13px; color:var(--text-light);">0</span>
+                </span>
+                <!-- Manual Temporal Bypass Toggle — clearly labelled for A/B comparison (§6.4) -->
+                <div class="bypass-toggle-wrap" title="Toggle Temporal Bypass ON/OFF to compare cycle counts (Report §6.4)">
+                    <span id="bypass-label" class="bypass-label-on">TEMPORAL ON</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="bypass-toggle" checked onchange="onBypassToggle(this)">
                         <span class="toggle-slider"></span>
@@ -527,13 +533,18 @@
 
     let autoRunning = false;
 
-    // --- MANUAL BYPASS TOGGLE ---
+    // --- MANUAL BYPASS TOGGLE (Report §6.4 — A/B comparison tool) ---
     function onBypassToggle(checkbox) {
         const enabled = checkbox.checked;
         socket.emit('set_temporal_bypass_manual', { enabled: enabled });
         const label = document.getElementById('bypass-label');
-        label.textContent = enabled ? 'BYPASS' : 'NO BYPASS';
-        label.className = enabled ? 'bypass-label-on' : 'bypass-label-off';
+        if (enabled) {
+            label.textContent = 'TEMPORAL ON';
+            label.className = 'bypass-label-on';
+        } else {
+            label.textContent = 'NORMAL ONLY';
+            label.className = 'bypass-label-off';
+        }
     }
 
     socket.on('timm-tick', function(newState) {
@@ -550,8 +561,13 @@
         if (typeof newState.temporal_bypass_manual_enabled === 'boolean') {
             toggleEl.checked = newState.temporal_bypass_manual_enabled;
             const label = document.getElementById('bypass-label');
-            label.textContent = newState.temporal_bypass_manual_enabled ? 'BYPASS' : 'NO BYPASS';
-            label.className = newState.temporal_bypass_manual_enabled ? 'bypass-label-on' : 'bypass-label-off';
+            if (newState.temporal_bypass_manual_enabled) {
+                label.textContent = 'TEMPORAL ON';
+                label.className = 'bypass-label-on';
+            } else {
+                label.textContent = 'NORMAL ONLY';
+                label.className = 'bypass-label-off';
+            }
         }
     });
 
@@ -617,23 +633,29 @@
         document.getElementById("reg-inst").innerText = state.current_instruction || "";
         document.getElementById("ui-cycles").innerText = state.cycles || "0";
 
+        // Cycles Saved — the key metric (Report §6.5)
+        document.getElementById("ui-cycles-saved").innerText = state.cycles_saved || "0";
+
         // Last cost display
         const costEl = document.getElementById("ui-clk-cost");
         if (state.clock_cycles_remaining > 0) {
-            costEl.innerText = state.clock_cycles_remaining + (state.MPO_decision ? " ⚡BYPASS" : "");
+            costEl.innerText = state.clock_cycles_remaining + (state.MPO_decision ? " ⚡" : "");
+            costEl.style.color = state.MPO_decision ? 'var(--bus-temporal)' : '#d28a5e';
         }
 
-        // Zero flag live display
+        // ALU Flags — Z, C, N
         const zEl = document.getElementById("ui-zflag");
-        if (state.zero_flag) {
-            zEl.innerText = "1";
-            zEl.style.color = "var(--bus-temporal)";
-            zEl.style.fontWeight = "900";
-        } else {
-            zEl.innerText = "0";
-            zEl.style.color = "var(--text-light)";
-            zEl.style.fontWeight = "700";
+        const cEl = document.getElementById("ui-cflag");
+        const nEl = document.getElementById("ui-nflag");
+
+        function setFlag(el, val) {
+            el.innerText = val ? '1' : '0';
+            el.style.color = val ? 'var(--bus-temporal)' : 'var(--text-light)';
+            el.style.fontWeight = val ? '900' : '700';
         }
+        setFlag(zEl, state.zero_flag);
+        setFlag(cEl, state.carry_flag);
+        setFlag(nEl, state.neg_flag);
 
         // Temporal banner
         const banner = document.getElementById('temporal-banner');
@@ -760,14 +782,22 @@
                 </div>`;
         }
         else if (component === "ALU") {
+            const saved = state.cycles_saved || 0;
+            const efficiency = state.cycles > 0 ? ((saved / (state.cycles + saved)) * 100).toFixed(1) : '0.0';
             content += `<div style="font-weight:800; margin-bottom:10px; color:var(--text-dark);">Current Operation:</div>
                 <div style="font-family:monospace; background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:8px; font-weight:bold; font-size:15px; color:var(--bus-control);">${state.current_instruction || 'IDLE'}</div>
-                <div style="margin-top:10px; font-size:13px; color:var(--text-dark);">
-                    AC = <b style="color:var(--bus-control);">${state.AC || '00'}</b> (hex) &nbsp;|&nbsp;
-                    Z-Flag = <b style="color:${state.zero_flag?'var(--bus-temporal)':'var(--text-light)'};">${state.zero_flag?'1':'0'}</b>
+                <div style="margin-top:10px; font-size:13px; color:var(--text-dark); display:flex; gap:12px; flex-wrap:wrap;">
+                    <span>AC = <b style="color:var(--bus-control);">${state.AC || '00'}</b></span>
+                    <span style="color:${state.zero_flag?'var(--bus-temporal)':'var(--text-light)'};">Z=${state.zero_flag?'1':'0'}</span>
+                    <span style="color:${state.carry_flag?'#e67e22':'var(--text-light)'};">C=${state.carry_flag?'1':'0'}</span>
+                    <span style="color:${state.neg_flag?'#c0392b':'var(--text-light)'};">N=${state.neg_flag?'1':'0'}</span>
+                </div>
+                <div style="margin-top:12px; background:#f0fff4; border:1px solid #7db18b; border-radius:6px; padding:10px; font-size:13px;">
+                    <b style="color:#7db18b;">⚡ Cycles Saved:</b> <b style="font-size:16px; color:#7db18b;">${saved}</b>
+                    &nbsp;&nbsp;<b style="color:var(--text-light);">Efficiency:</b> <b style="color:#7db18b;">${efficiency}%</b>
                 </div>
                 <div style="margin-top:8px; font-size:12px; color:var(--text-light);">
-                    All ALU ops (ADD, SUB, AND, OR, INC, DEC, SHL, SHR) compute 8-bit results (&amp; 0xFF) and update the Zero Flag. JNZ reads this flag — if Z=0 (AC≠0), it jumps.
+                    Each Temporal Bypass saves 2 T-states (T4+T5 eliminated). Running the same program in NORMAL ONLY mode will show 0 saved — that's your 33% baseline.
                 </div>`;
         }
         else {

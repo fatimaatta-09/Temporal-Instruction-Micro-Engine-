@@ -345,10 +345,11 @@
 
     // --- WEBSOCKET LISTENERS ---
 
-    // 1. CPU triggers an OUT instruction
+    // 1. CPU executes OUT 1 — this is the AUTHORITATIVE display update.
+    //    Only OUT 1 should change what's shown on the 7-segment.
     socket.on('display_update', (data) => {
       accumulatorValue = data.value;
-      // Zero flag glow: if displayed value is 0, add teal glow
+      // Teal border glow when the output value is zero
       if (data.value === 0) {
         container.classList.add('zero-flag-active');
       } else {
@@ -357,7 +358,7 @@
       renderDisplay();
     });
 
-    // 2. CPU triggers an IN instruction (Halts and waits)
+    // 2. CPU executes INP — glow amber and unlock the keypad
     socket.on('request_input', () => {
       isWaitingForInput = true;
       inputBuffer = "";
@@ -366,14 +367,35 @@
       renderDisplay();
     });
 
-    // 3. CPU accepts the input and resumes clock
-    socket.on('input_accepted', () => {
+    // 3. User pressed ENTER on the keypad — show their number immediately
+    //    on the 7-segment (before any OUT instruction runs), and stop waiting.
+    socket.on('input_accepted', (data) => {
+      // Use the value sent from the backend; fall back to whatever was typed
+      const accepted = (data && typeof data.value === 'number')
+                       ? data.value
+                       : (inputBuffer !== "" ? parseInt(inputBuffer, 10) : accumulatorValue);
+      accumulatorValue = isNaN(accepted) ? 0 : accepted;
       isWaitingForInput = false;
       inputBuffer = "";
       container.classList.remove('waiting-for-input');
+      renderDisplay();   // show the entered value immediately
     });
 
-    // Initial render
+    // 4. Sync from every CPU tick — only used to keep AC in sync for 
+    //    the MODE button display (HEX/BIN views of the current AC value).
+    //    Does NOT call renderDisplay so it never overwrites an OUT display.
+    socket.on('timm-tick', (state) => {
+      if (!isWaitingForInput) {
+        const acHex = state.AC || "00";
+        accumulatorValue = parseInt(acHex, 16);
+        // NOTE: renderDisplay() is intentionally NOT called here.
+        // The display only updates when OUT 1 fires (display_update)
+        // or when the user submits keypad input (input_accepted).
+        // This prevents the 7-segment from flickering during auto-run.
+      }
+    });
+
+    // Initial render — all digits blank at boot
     renderDisplay();
 
   </script>
