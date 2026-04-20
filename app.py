@@ -380,11 +380,11 @@ def _do_step():
         cpu_state["neg_flag"]   = bool(result_8bit & 0x80)
 
     if opcode == 1:      # LDA — load from RAM; bypass allowed
+        # §2.6: LDA is a memory transfer (AC ← MBR), NOT an ALU operation — flags NOT updated
         result = main_memory[actual_addr]
         cpu_state["AC"] = result
-        set_flags(result, result)
         active_wires.extend(["wire-alu-data", "wire-ac-data"])
-        active_comps.extend(["block-alu", "block-ac"])
+        active_comps.extend(["block-ac"])
 
     elif opcode == 2:    # STA — store AC to RAM; ALWAYS Normal path (no bypass)
         # STA requires MBR staging for write; the report explicitly excludes it from bypass
@@ -425,9 +425,9 @@ def _do_step():
         set_flags(result, result)
         active_comps.extend(["block-alu", "block-ac"])
 
-    elif opcode == 5:    # MVI — immediate, single-cycle, not logged by THB
+    elif opcode == 5:    # MVI — immediate load (AC ← IR[3:0]); NOT an ALU op — flags NOT updated
+        # §2.6: MVI is a data move, not an ALU compute — Z/C/N must not be affected
         cpu_state["AC"] = actual_addr
-        set_flags(actual_addr, actual_addr)
         active_comps.extend(["block-ac"])
 
     elif opcode == 6:    # ADI — immediate, single-cycle
@@ -480,10 +480,13 @@ def _do_step():
         set_flags(raw, result)
         active_comps.extend(["block-alu", "block-ac"])
 
-    elif ir_val == 0xE2: # SHR
+    elif ir_val == 0xE2: # SHR — §2.6.2: carry captures LSB (the bit shifted out) of original AC
+        carry_out = cpu_state["AC"] & 0x01         # LSB is shifted out
         result = cpu_state["AC"] >> 1
         cpu_state["AC"] = result
-        set_flags(result, result)
+        cpu_state["zero_flag"]  = (result == 0)
+        cpu_state["carry_flag"] = bool(carry_out)
+        cpu_state["neg_flag"]   = bool(result & 0x80)
         active_comps.extend(["block-alu", "block-ac"])
 
     elif ir_val == 0xF0: # HLT
@@ -505,7 +508,7 @@ def _do_step():
         if len(network_rx_buffer) > 0:
             val = network_rx_buffer.pop(0) & 0xFF
             cpu_state["AC"] = val
-            set_flags(val, val)
+            # §2.6: INP is a data transfer — flags NOT updated
             socketio.emit('update_nc_buffer_ui', {'count': len(network_rx_buffer)})
             # Show the received value on the display immediately (same as keypad INP)
             socketio.emit('display_update', {'value': val})
@@ -794,10 +797,7 @@ def handle_keypad_enter(data):
         cpu_state['AC'] = val
         cpu_state['input_buffer'] = val
         cpu_state['fgi_flag'] = True
-        # Update ALU flags for the loaded value
-        cpu_state['zero_flag'] = (val == 0)
-        cpu_state['neg_flag'] = bool(val & 0x80)
-        cpu_state['carry_flag'] = False
+        # §2.6: INP is a data transfer (AC ← input port), NOT an ALU op — flags NOT updated
         cpu_waiting_for_input = False
         active_in_port = 0
         cpu_state['PC'] = (cpu_state['PC'] + 1) & 0xF
@@ -847,9 +847,7 @@ def handle_pc_network_traffic(data):
         val = network_rx_buffer.pop(0)
         accumulator = val
         cpu_state['AC'] = val
-        cpu_state['zero_flag'] = (val == 0)
-        cpu_state['neg_flag'] = bool(val & 0x80)
-        cpu_state['carry_flag'] = False
+        # §2.6: INP is a data transfer (AC ← network port), NOT an ALU op — flags NOT updated
         cpu_waiting_for_input = False
         active_in_port = 0
         cpu_state['PC'] = (cpu_state['PC'] + 1) & 0xF
