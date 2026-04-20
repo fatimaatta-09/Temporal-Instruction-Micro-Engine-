@@ -1,0 +1,6 @@
+
+/build/
+app.spec
+__pycache__/
+*.py[cod]
+timm_system.log

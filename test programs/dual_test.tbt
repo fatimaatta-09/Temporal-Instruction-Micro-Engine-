@@ -1,0 +1,14 @@
+ORG 0       ; Start at Address 0
+MVI 5       ; Load loop counter (5) into AC
+STA E       ; Store counter in RAM Slot E
+MVI 1       ; Load decrement value (1) into AC
+STA F       ; Store decrement in RAM Slot F
+
+; --- LOOP START (Address 4) ---
+LDA E       ; [Step 1] Load current counter
+OUT 1       ; [Step 2] Show counter on Display
+SUB F       ; [Step 3] Subtract 1 from counter
+STA E       ; [Step 4] Save updated counter to RAM
+JNZ 4       ; [Step 5] If AC != 0, Jump back to Address 4
+
+HLT         ; Exit Program

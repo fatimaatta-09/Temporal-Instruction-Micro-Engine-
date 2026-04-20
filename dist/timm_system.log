@@ -1,0 +1,14 @@
+--- TIMM SYSTEM LOG BOOTING ---
+Starting Socket.IO Server...
+ * Serving Flask app 'app'
+ * Debug mode: off
+Launching PyWebView Window...
+Serving index.html
+Frontend connected via WebSocket!
+Frontend connected via WebSocket!
+Frontend connected via WebSocket!
+Frontend connected via WebSocket!
+Frontend connected via WebSocket!
+Frontend connected via WebSocket!
+Frontend connected via WebSocket!
+Frontend connected via WebSocket!

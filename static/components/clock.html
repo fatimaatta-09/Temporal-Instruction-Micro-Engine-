@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>System Clock Component</title>
   
+  <script src="/static/socket.io.min.js"></script>
+  
   <style>
     /* --- GENERAL PAGE LAYOUT (STRIPPED PADDING FOR PERFECT ALIGNMENT) --- */
     body {
@@ -29,7 +31,7 @@
       border: 2px solid #5a5475; 
       border-radius: 8px;
       background: #ffffff; 
-      padding: 20px 40px;
+      padding: 10px 40px; /* Reduced from 20px 40px */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -48,7 +50,7 @@
       align-items: center;
       gap: 50px;
       transition: visibility 0s, opacity 0.2s linear;
-      padding-bottom: 25px; 
+      padding-bottom: 15px; /* Reduced from 25px */
     }
 
     /* --- LEFT COLUMN: CLOCK & TITLE --- */
@@ -67,12 +69,12 @@
       letter-spacing: 2px;
       text-align: center;
       color: #5a5475;
-      font-size: 20px;
+      font-size: 16px; /* Reduced from 20px */
     }
 
     .clock-icon-container {
-      width: 130px;
-      height: 130px;
+      width: 90px;  /* Reduced from 130px */
+      height: 90px; /* Reduced from 130px */
       flex-shrink: 0;
     }
 
@@ -223,7 +225,7 @@
     /* --- BOTTOM CENTER: TOGGLE BUTTON --- */
     .btn-action {
       position: absolute;
-      bottom: 15px; 
+      bottom: 5px; /* Reduced from 15px */
       background-color: #ffffff;
       color: #5a5475;
       border: 2px solid #5a5475;
@@ -242,11 +244,64 @@
       color: #333333;
     }
 
+    /* --- BYPASS MODE INDICATOR --- */
+    .bypass-badge {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1.5px solid #b8b4c7;
+      color: #b8b4c7;
+      background: #ffffff;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
+    }
+    .bypass-badge.active {
+      border-color: #d28a5e;
+      color: #d28a5e;
+      background: #fff7ed;
+      box-shadow: 0 0 8px rgba(210,138,94,0.3);
+    }
+
+    /* Cycle cost flash label */
+    .cycle-flash {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1.5px solid #b8b4c7;
+      color: #b8b4c7;
+      background: #ffffff;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
+    }
+    .cycle-flash.show-4 {
+      border-color: #d28a5e;
+      color: #d28a5e;
+      background: #fff7ed;
+    }
+    .cycle-flash.show-6 {
+      border-color: #75b8b6;
+      color: #75b8b6;
+      background: #ecfdf5;
+    }
+
   </style>
 </head>
 <body>
 
-  <div class="clock-module sim-module">
+  <div class="clock-module sim-module" style="position:relative;">
+
+    <div class="cycle-flash" id="cycle-flash">T: —</div>
+    <div class="bypass-badge" id="bypass-badge">NORMAL</div>
 
     <div class="clock-contents" id="clock-contents">
       
@@ -338,6 +393,9 @@
   </div>
 
   <script>
+    // NEW: Initialize WebSocket connection to Python backend
+    const socket = io();
+
     // --- Elements ---
     const clockSlider = document.getElementById('clock-slider');
     const clockInput = document.getElementById('clock-input');
@@ -360,7 +418,7 @@
       '7': ['.a','.b','.c'],
       '8': ['.a','.b','.c','.d','.e','.f','.g'],
       '9': ['.a','.b','.c','.d','.f','.g'],
-      ' ': [] // blank
+      ' ': []
     };
 
     // --- Show/Hide Logic ---
@@ -387,63 +445,85 @@
 
     function update7SegmentDisplay(valueNum) {
       if (isNaN(valueNum)) {
-        setDigit(dig0, ' ');
-        setDigit(dig1, ' ');
-        setDigit(dig2, ' ');
+        setDigit(dig0, ' '); setDigit(dig1, ' '); setDigit(dig2, ' ');
         return;
       }
-      
       let displayVal = valueNum;
       if (displayVal > 99.9) displayVal = 99.9;
-
       let str = displayVal.toFixed(1);
-      
-      if (displayVal < 10) {
-        str = " " + str;
-      }
-
+      if (displayVal < 10) str = " " + str;
       setDigit(dig0, str[0]);
-      setDigit(dig1, str[1]); 
+      setDigit(dig1, str[1]);
       setDigit(dig2, str[3]);
     }
 
     // --- Interaction Handlers ---
     clockSlider.addEventListener('input', () => {
       const val = parseFloat(clockSlider.value);
-      clockInput.value = val; 
-      update7SegmentDisplay(val); 
+      clockInput.value = val;
+      update7SegmentDisplay(val);
+      socket.emit('set_speed', { speed: val });
     });
 
     clockInput.addEventListener('input', () => {
       let val = parseFloat(clockInput.value);
-      
       if (isNaN(val)) {
         setDigit(dig0, ' '); setDigit(dig1, ' '); setDigit(dig2, ' ');
       } else {
         update7SegmentDisplay(val);
-        
-        let sliderVal = val;
-        if (sliderVal < 0.2) sliderVal = 0.2;
-        if (sliderVal > 50) sliderVal = 50;
+        let sliderVal = Math.max(0.2, Math.min(50, val));
         clockSlider.value = sliderVal;
+        socket.emit('set_speed', { speed: sliderVal });
       }
     });
 
     clockInput.addEventListener('change', () => {
       let val = parseFloat(clockInput.value);
-      
       if (isNaN(val) || val < 0.2) val = 0.2;
       if (val > 50) val = 50;
-      
       clockInput.value = val;
-      clockSlider.value = val; 
-      update7SegmentDisplay(val); 
+      clockSlider.value = val;
+      update7SegmentDisplay(val);
+      socket.emit('set_speed', { speed: val });
+    });
+
+    // --- Clock tick: update cycle cost flash + bypass badge ---
+    const cycleFashEl = document.getElementById('cycle-flash');
+    const bypassBadge = document.getElementById('bypass-badge');
+    let cycleFlashTimeout = null;
+
+    socket.on('timm-tick', (state) => {
+      const cost = state.clock_cycles_remaining;
+      const isBypass = state.MPO_decision === true;
+      const manualOff = state.temporal_bypass_manual_enabled === false;
+
+      // Bypass badge
+      if (manualOff) {
+        bypassBadge.textContent = 'BYPASS OFF';
+        bypassBadge.className = 'bypass-badge';
+      } else if (isBypass) {
+        bypassBadge.textContent = '⚡ BYPASS';
+        bypassBadge.className = 'bypass-badge active';
+      } else {
+        bypassBadge.textContent = 'NORMAL';
+        bypassBadge.className = 'bypass-badge';
+      }
+
+      // Cycle cost flash
+      if (cost && cost > 0) {
+        cycleFashEl.textContent = `T: ${cost}`;
+        cycleFashEl.className = cost <= 4 ? 'cycle-flash show-4' : 'cycle-flash show-6';
+        if (cycleFlashTimeout) clearTimeout(cycleFlashTimeout);
+        cycleFlashTimeout = setTimeout(() => {
+          cycleFashEl.textContent = 'T: —';
+          cycleFashEl.className = 'cycle-flash';
+        }, 900);
+      }
     });
 
     // --- Clock Hand Animation Logic ---
     let currentRotation = 0;
     let lastTime = performance.now();
-    
     let timeAtMax = 0;
     let handFlewOff = false;
     let flyOffX = 0, flyOffY = 0, flyOffVX = 0, flyOffVY = 0;
@@ -452,7 +532,6 @@
     function animateClockHand(currentTime) {
       const deltaTime = currentTime - lastTime;
       lastTime = currentTime;
-
       const hz = parseFloat(clockSlider.value) || 0.2;
 
       if (hz >= 50) {
@@ -461,41 +540,37 @@
         timeAtMax = 0;
         if (handFlewOff) {
           handFlewOff = false;
-          flyOffX = 0; flyOffY = 0; 
+          flyOffX = 0; flyOffY = 0;
         }
       }
 
       let wobble = 0;
-      if (timeAtMax > 1500 && !handFlewOff) {
-        wobble = Math.sin(timeAtMax * 0.05) * 8; 
-      }
+      if (timeAtMax > 1500 && !handFlewOff) wobble = Math.sin(timeAtMax * 0.05) * 8;
 
       if (timeAtMax > 2500 && !handFlewOff) {
         handFlewOff = true;
-        flyOffVX = 15; 
-        flyOffVY = -20; 
-        flyRotation = currentRotation;
+        flyOffVX = 15; flyOffVY = -20; flyRotation = currentRotation;
       }
 
       if (handFlewOff) {
         flyOffX += flyOffVX;
         flyOffY += flyOffVY;
-        flyOffVY += 1; 
-        flyRotation += 45; 
-        
+        flyOffVY += 1;
+        flyRotation += 45;
         clockHand.setAttribute('transform', `translate(${flyOffX}, ${flyOffY}) rotate(${flyRotation}, 100, 100)`);
       } else {
         const degreesToRotate = hz * 360 * (deltaTime / 1000);
         currentRotation = (currentRotation + degreesToRotate) % 360;
-        
         clockHand.setAttribute('transform', `rotate(${currentRotation + wobble}, 100, 100)`);
       }
 
       requestAnimationFrame(animateClockHand);
     }
 
+    // Initialize
     update7SegmentDisplay(1.0);
     requestAnimationFrame(animateClockHand);
+    socket.emit('set_speed', { speed: 1.0 });
 
   </script>
 </body>

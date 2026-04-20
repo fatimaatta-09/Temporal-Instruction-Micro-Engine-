@@ -5,25 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Network Logs Component</title>
   
+  <script src="/static/socket.io.min.js"></script>
+
   <style>
     /* --- RAW IC HARDWARE AESTHETIC --- */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff; 
-      border: 2px solid #5a5475; /* Signature blueprint border */
-      border-radius: 8px; /* Smooth IC corners */
+      border: 2px solid #5a5475; 
+      border-radius: 8px; 
       color: #333333;
       display: flex;
       flex-direction: column;
       margin: 0;
-      height: 100vh; /* Fills the exact modal height */
+      height: 100vh; 
       box-sizing: border-box;
-      overflow: hidden; /* Banishes scrollbars */
+      overflow: hidden; 
     }
 
     /* --- SLEEK IC HEADER --- */
     .ic-header {
-      background-color: #f8f8fc; /* Slight contrast for header */
+      background-color: #f8f8fc; 
       border-bottom: 2px solid #e2e2ec; 
       padding: 10px 15px;
       display: flex;
@@ -32,17 +34,18 @@
     }
 
     .ic-title {
-      font-size: 14px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
       font-weight: bold;
       color: #333333;
       letter-spacing: 0.5px;
     }
 
-    /* Circular 'X' close button like the IR Inspector */
+    /* Circular 'X' close button */
     .ic-close-btn {
       background: #eef0f5;
       border: 1px solid #b8b4c7;
-      border-radius: 50%; /* Perfect circle */
+      border-radius: 50%; 
       width: 24px;
       height: 24px;
       display: flex;
@@ -71,10 +74,32 @@
       overflow: hidden;
     }
 
+    /* Stats footer */
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 15px;
+      border-top: 1px solid #e2e2ec;
+      background: #f8f8fc;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      color: #5a5475;
+      flex-shrink: 0;
+    }
+    .stat-badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .stat-buffered { background: #fff3e0; color: #d28a5e; border: 1px solid #d28a5e; }
+    .stat-broadcast { background: #fdf4ff; color: #d42df2; border: 1px solid #d42df2; }
+
     /* --- LOGS TABLE WRAPPER --- */
     .logs-wrapper {
       width: 100%;
-      flex-grow: 1; /* Spring-loads the table to fill all space */
+      flex-grow: 1; 
       border: 1px solid #b8b4c7;
       border-radius: 4px;
       overflow-y: auto;
@@ -85,38 +110,41 @@
       width: 100%;
       border-collapse: collapse;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 12px;
+      font-size: 13px;
     }
 
     th {
-      background-color: #eef0f5;
-      color: #5a5475;
-      padding: 10px;
+      background-color: #5a5475;
+      color: #ffffff;
+      padding: 12px 10px;
       text-align: left;
-      border-bottom: 1px solid #b8b4c7;
-      border-right: 1px solid #e2e2ec;
       position: sticky; 
       top: 0;
       font-weight: bold;
-    }
-
-    th:last-child { 
-      border-right: none; 
+      letter-spacing: 1px;
     }
 
     td {
       padding: 12px 10px;
-      color: #888888;
-      text-align: center;
-      font-style: italic;
+      color: #555555;
+      text-align: left;
       border-bottom: 1px solid #e2e2ec;
     }
+
+    /* Highlight rows slightly when hovering */
+    tr:hover td {
+        background-color: #f8f8fc;
+    }
+
+    /* Status Color Coding */
+    .status-buffered { color: #d28a5e; font-weight: bold; }
+    .status-broadcast { color: #d42df2; font-weight: bold; }
   </style>
 </head>
 <body>
 
   <div class="ic-header">
-    <div class="ic-title">Network Logs</div>
+    <div class="ic-title">NETWORK TRAFFIC LOGS</div>
     <button class="ic-close-btn" id="hide-logs-btn">✕</button>
   </div>
 
@@ -133,21 +161,80 @@
         </thead>
         <tbody id="logs-body">
           <tr>
-            <td colspan="4">Awaiting network activity...</td>
+            <td colspan="4" style="text-align: center; font-style: italic;">Awaiting network activity...</td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 
+  <div class="stats-bar">
+    <span>TOTAL: <b id="stat-total">0</b></span>
+    <span class="stat-badge stat-buffered">IN: <span id="stat-buffered">0</span></span>
+    <span class="stat-badge stat-broadcast">OUT: <span id="stat-broadcast">0</span></span>
+  </div>
+
   <script>
-    // --- SECURE MODAL CLOSE LOGIC ---
-    // Fires a message to the Mainframe telling it to close the modal
+    const socket = io();
+    const logsBody = document.getElementById('logs-body');
+
+    // --- 1. SECURE MODAL CLOSE LOGIC (Kept Intact for your Mainframe) ---
     document.getElementById('hide-logs-btn').addEventListener('click', function() {
       if (window.parent) {
         window.parent.postMessage({ action: 'closeNetworkLogsPopup' }, '*');
       }
     });
+
+    // --- 2. FETCH DATA ON LOAD ---
+    // The moment this iframe is opened/loaded, ask Python for the logs
+    socket.emit('request_network_logs');
+
+    // --- 3. RENDER THE LOGS ---
+    socket.on('deliver_network_logs', (data) => {
+        logsBody.innerHTML = '';
+        
+        if (data.logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; font-style: italic;">No activity yet.</td></tr>';
+            document.getElementById('stat-total').innerText = 0;
+            document.getElementById('stat-buffered').innerText = 0;
+            document.getElementById('stat-broadcast').innerText = 0;
+            return;
+        }
+
+        // Stats
+        const bufferedCount = data.logs.filter(l => l.status === 'Buffered').length;
+        const broadcastCount = data.logs.filter(l => l.status === 'Broadcast').length;
+        document.getElementById('stat-total').innerText = data.logs.length;
+        document.getElementById('stat-buffered').innerText = bufferedCount;
+        document.getElementById('stat-broadcast').innerText = broadcastCount;
+        
+        // Newest logs at top
+        [...data.logs].reverse().forEach(log => {
+            const row = document.createElement('tr');
+            let statusClass = '';
+            if (log.status === 'Buffered') statusClass = 'status-buffered';
+            if (log.status === 'Broadcast') statusClass = 'status-broadcast';
+            row.innerHTML = `
+                <td>${log.time}</td>
+                <td><strong>${log.source}</strong></td>
+                <td style="font-family: monospace; font-size: 16px;">${log.payload}</td>
+                <td class="${statusClass}">${log.status}</td>
+            `;
+            logsBody.appendChild(row);
+        });
+    });
+
+    // --- 4. AUTO-REFRESH LISTENER ---
+    // If the modal is left open while the CPU is running, it will listen to the same
+    // events the LAN uses, and automatically refresh the table live!
+    socket.on('update_nc_buffer_ui', () => {
+        socket.emit('request_network_logs');
+    });
+
+    socket.on('network_broadcast_rx', () => {
+        socket.emit('request_network_logs');
+    });
+
   </script>
 
 </body>

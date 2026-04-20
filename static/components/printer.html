@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Printer Component</title>
   
+  <script src="/static/socket.io.min.js"></script>
+
   <style>
     /* --- GENERAL LAYOUT --- */
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Blueprint Standard */
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
       background-color: transparent; 
       color: #333333; 
       display: flex;
@@ -53,7 +55,7 @@
       flex-shrink: 0;
     }
 
-    /* BUMPED: Title Banner */
+    /* Title Banner */
     .title-banner {
       width: 100%;
       border: 2px solid #5a5475;
@@ -62,7 +64,7 @@
       padding: 8px;
       text-align: center;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 22px; /* Matched Blueprint */
+      font-size: 22px; 
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 2px;
@@ -94,7 +96,7 @@
       height: 100%;
     }
 
-    /* BUMPED: Standard Button Styles */
+    /* Standard Button Styles */
     .btn {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
@@ -102,12 +104,12 @@
       border: 2px solid #5a5475;
       cursor: pointer;
       border-radius: 6px;
-      font-size: 16px; /* Blueprint Base */
-      transition: all 0.2s ease;
+      font-size: 16px; 
+      transition: all 0.3s ease;
       text-align: center;
       box-sizing: border-box;
       font-weight: bold;
-      text-transform: uppercase; /* Standardized */
+      text-transform: uppercase; 
       letter-spacing: 1px;
     }
 
@@ -121,6 +123,7 @@
       border-color: #b8b4c7;
       color: #b8b4c7;
       cursor: not-allowed;
+      box-shadow: none !important;
     }
 
     /* The large "Tear paper" area fills the whole right side */
@@ -130,8 +133,103 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 18px; /* Slightly larger text to fill the giant button space, but still obeys blueprint styling */
+      font-size: 18px; 
       padding: 0;
+    }
+
+    /* Glowing state when CPU queues jobs */
+    .btn-glow {
+      box-shadow: 0 0 20px rgba(210, 138, 94, 0.8);
+      border-color: #d28a5e;
+      background-color: #fff3e0;
+      color: #d28a5e;
+    }
+    .btn-glow:hover:not(:disabled) {
+      background-color: #ffe0b2;
+      color: #b8734b;
+    }
+
+    /* --- POPUP MODAL STYLES --- */
+    .modal-overlay {
+      display: none; 
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-content {
+      background: #ffffff;
+      border: 2px solid #5a5475;
+      border-radius: 8px;
+      width: 80%;
+      max-width: 350px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      animation: popIn 0.3s ease-out forwards;
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.9); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      font-size: 18px;
+      color: #ffffff;
+      background-color: #5a5475;
+      padding: 12px 15px;
+      display: flex;
+      justify-content: space-between;
+      border-top-left-radius: 5px;
+      border-top-right-radius: 5px;
+    }
+
+    .modal-close {
+      cursor: pointer;
+      color: #ffbba6;
+      font-weight: bold;
+    }
+    .modal-close:hover {
+      color: #ffffff;
+    }
+
+    .modal-body {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 15px;
+      background-color: #fcfcfc;
+    }
+
+    /* The "Paper Receipt" look for the data */
+    .receipt-log {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333333;
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .receipt-log li {
+      padding: 5px 0;
+      border-bottom: 1px dashed #cccccc;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .receipt-log li span.index {
+      color: #888888;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -155,8 +253,8 @@
           
           <path d="M170 70 L200 70 L210 80 L210 100 L170 100 Z" fill="#cccccc" stroke="#000000" stroke-width="1.5"/>
           <circle cx="180" cy="85" r="4" fill="#333333" stroke="#000000"/>
-          <circle cx="190" cy="85" r="2.5" fill="#f44336" stroke="#000000"/> 
-          <circle cx="190" cy="92" r="2.5" fill="#4CAF50" stroke="#000000"/> 
+          <circle id="led-red" cx="190" cy="85" r="2.5" fill="#f44336" stroke="#000000"/> 
+          <circle id="led-green" cx="190" cy="92" r="2.5" fill="#4CAF50" stroke="#000000"/> 
           
           <path d="M60 45 L150 45 L155 70 L55 70 Z" fill="#eef0f5" stroke="#000000" stroke-width="1.5"/>
           <path d="M80 15 L160 15 L165 60 L75 60 Z" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
@@ -182,25 +280,108 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="printer-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>PRINTER LOG</span>
+        <span class="modal-close" id="modal-close">X</span>
+      </div>
+      <div class="modal-body">
+        <ul class="receipt-log" id="receipt-list">
+          </ul>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const socket = io();
+
+    // Elements
     const tearPaperBtn = document.getElementById('tear-paper-btn');
     const printedSheet = document.getElementById('printed-sheet');
+    const printerModal = document.getElementById('printer-modal');
+    const modalClose = document.getElementById('modal-close');
+    const receiptList = document.getElementById('receipt-list');
+    
+    // Default Text
+    const defaultBtnText = "TEAR PAPER";
 
-    // --- ANIMATION LOGIC ---
+    // --- SOCKET LISTENERS ---
+
+    // 1. CPU has queued outputs into the Printer Buffer
+    socket.on('printer_job_ready', (data) => {
+      // Glow the button and update text with the queue count
+      tearPaperBtn.classList.add('btn-glow');
+      tearPaperBtn.textContent = `PRINT PAPER (${data.queue_size})`;
+    });
+
+    // 2. Button is clicked -> We ask Python for the data
     tearPaperBtn.addEventListener('click', function() {
-      printedSheet.classList.remove('printing');
-      void printedSheet.offsetWidth; 
-      printedSheet.classList.add('printing');
+      // Only do the full animation/fetch if there is actually a job queued
+      // (Checking if the button says PRINT PAPER)
+      if (tearPaperBtn.classList.contains('btn-glow')) {
+        
+        // Trigger paper sliding out animation
+        printedSheet.classList.remove('printing');
+        void printedSheet.offsetWidth; // Trigger reflow
+        printedSheet.classList.add('printing');
 
-      const originalText = "TEAR PAPER";
-      tearPaperBtn.textContent = "PRINTING..."; // Capitalized JS update
-      tearPaperBtn.disabled = true; 
+        tearPaperBtn.textContent = "PRINTING..."; 
+        tearPaperBtn.disabled = true; 
+        tearPaperBtn.classList.remove('btn-glow');
 
+        // Request the data from Python Backend
+        socket.emit('request_print_job');
+
+      } else {
+        // If clicked while empty, just do a tiny visual bump, no pop-up
+        tearPaperBtn.textContent = "EMPTY";
+        setTimeout(() => tearPaperBtn.textContent = defaultBtnText, 800);
+      }
+    });
+
+    // 3. Python delivers the array of numbers
+    socket.on('deliver_print_job', (data) => {
+      // Wait for the paper sliding animation to finish (1.5s), THEN show the popup
       setTimeout(() => {
-        tearPaperBtn.textContent = originalText;
-        tearPaperBtn.disabled = false;
+        // Populate the popup list
+        receiptList.innerHTML = "";
+        const numbers = data.data; // Array of ints
+        
+        numbers.forEach((num, index) => {
+          const li = document.createElement('li');
+          li.innerHTML = `<span class="index">OUTPUT [${index}]</span> <span>${num}</span>`;
+          receiptList.appendChild(li);
+        });
+
+        // Show the modal
+        printerModal.style.display = "flex";
       }, 1500);
     });
+
+    // 4. Reset the Printer Button after the job is handed over
+    socket.on('printer_queue_empty', () => {
+      setTimeout(() => {
+        tearPaperBtn.textContent = defaultBtnText;
+        tearPaperBtn.disabled = false;
+        // Reset paper animation
+        printedSheet.classList.remove('printing'); 
+      }, 1500); // Wait for animation to finish before resetting text
+    });
+
+
+    // --- MODAL CLOSE LOGIC ---
+    modalClose.addEventListener('click', () => {
+      printerModal.style.display = "none";
+    });
+
+    // Close modal if user clicks outside of the box
+    window.addEventListener('click', (event) => {
+      if (event.target == printerModal) {
+        printerModal.style.display = "none";
+      }
+    });
+
   </script>
 
 </body>

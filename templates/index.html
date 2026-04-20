@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>4-Bit Operational Core Simulator</title>
+    <script src="/static/socket.io.min.js"></script>
     <style>
         /* --- MAINFRAME BLUEPRINT THEME --- */
         body {
@@ -49,20 +50,25 @@
         /* Change the width numbers below to manually resize the side panels */
         /* The center panel will automatically grow to eat the remaining space */
         /* ================================================================= */
-        .panel-left { 
-            width: 340px; 
-            flex-shrink: 0; 
+                .panel-left { 
+            width: 325px; 
+            /* flex: grow shrink basis */
+            flex: 0 0 325px; 
+            max-width: 325px;
+            min-width: 325px;
         }
-        
+
         .panel-right { 
-            width: 360px; 
-            flex-shrink: 0; 
+            width: 345px; 
+            flex: 0 0 345px; 
+            max-width: 345px;
+            min-width: 345px;
         }
-        
+
         .panel-center { 
-            flex-grow: 1; 
+            flex: 1 1 auto; 
             overflow: visible !important; 
-        } 
+        }
         /* ================================================================= */
 
         .panel-header {
@@ -94,10 +100,9 @@
         #iframe-printer { width: 730px; }
         #iframe-lan { width: 1100px; }
 
-        /* --- THE ALIGNMENT FIX: CENTER MODULES MUST ANCHOR TOP-LEFT --- */
+       /* --- THE ALIGNMENT FIX: CENTER MODULES MUST ANCHOR TOP-LEFT --- */
         #iframe-cpu { width: 1200px; height: 760px; left: 0 !important; transform-origin: top left !important; }
-        #iframe-clock { width: 1200px; height: 240px; left: 0 !important; transform-origin: top left !important; }
-
+        #iframe-clock { width: 1200px; height: 160px; left: 0 !important; transform-origin: top left !important; }
         /* --- LEFT PANEL --- */
         .wrap-hd { flex-shrink: 0; } 
         .wrap-ram { flex-grow: 1; margin-bottom: 0; } 
@@ -124,8 +129,8 @@
         .team-member { color: #5a5475; }
 
         /* --- RIGHT PANEL --- */
-        .wrap-screen { flex-grow: 1; margin-bottom: 15px; min-height: 400px; } 
-        .wrap-printer { flex-shrink: 0; margin-bottom: 15px; } 
+        .wrap-screen { flex-grow: 1; margin-bottom: 7px; min-height: 370px;max-height: 370px; } 
+        .wrap-printer { flex-shrink: 0; margin-bottom: 7px; } 
         .wrap-lan { flex-shrink: 0; margin-bottom: 5px; } 
 
         /* --- LOGS MODAL --- */
@@ -169,9 +174,8 @@
                             <div class="info-body">
                                 <div class="team-row">
                                     <span class="team-label">TEAM MEMBERS:</span>
-                                    <span class="team-member">• Student Name 1 (ID: XXXXXX)</span>
-                                    <span class="team-member">• Student Name 2 (ID: XXXXXX)</span>
-                                    <span class="team-member">• Student Name 3 (ID: XXXXXX)</span>
+                                    <span class="team-member">• ALi Kamran (2024090)</span>
+                                    <span class="team-member">• Fatima Rehman (2024177)</span>
                                 </div>
                             </div>
                         </div>
@@ -211,7 +215,7 @@
                 const cScale = (centerC.clientWidth - 20) / 1200; // 20px padding deduction
                 document.getElementById('wrap-cpu').style.height = Math.floor(760 * cScale) + 'px';
                 document.getElementById('iframe-cpu').style.transform = `scale(${cScale})`;
-                document.getElementById('wrap-clock').style.height = Math.floor(240 * cScale) + 'px';
+                document.getElementById('wrap-clock').style.height = Math.floor(160 * cScale) + 'px';
                 document.getElementById('iframe-clock').style.transform = `scale(${cScale})`;
             }
 

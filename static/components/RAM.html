@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Main Memory Interface</title>
+  <title>Main Memory (RAM) Component</title>
   
+  <script src="/static/socket.io.min.js"></script>
+
   <style>
     /* --- GENERAL LAYOUT --- */
     body {
@@ -13,242 +15,296 @@
       color: #333333; 
       display: flex;
       justify-content: center;
-      padding: 10px; 
+      align-items: stretch;
+      padding: 0; 
       margin: 0;
       box-sizing: border-box;
-      height: 100vh;
-      width: 100vw;
-      overflow: hidden; 
+      height: 100vh; 
+      width: 100vw;  
     }
 
-    /* --- BORDERED OUTER CONTAINER --- */
-    .app-container {
-      width: 100%;
-      height: 100%;
+    /* --- RAM CONTAINER --- */
+    .ram-container {
+      width: 100%; 
+      height: 100%; 
       border: 2px solid #5a5475; 
-      border-radius: 8px;
-      background-color: #ffffff;
-      padding: 20px;
+      background-color: #ffffff; 
+      padding: 15px;
       display: flex;
       flex-direction: column;
-      align-items: center;
       box-sizing: border-box;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.02);
     }
 
-    /* BUMPED: Main Title */
+    /* Main Title */
     .main-title {
       font-family: 'Courier New', Courier, monospace;
       margin-top: 0;
-      margin-bottom: 15px;
-      font-size: 22px; 
+      margin-bottom: 10px;
+      font-size: 20px; 
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 2px;
       color: #5a5475;
       text-align: center;
-      flex-shrink: 0;
-    }
-
-    /* --- MEMORY WRAPPER --- */
-    .memory-block {
-      width: 100%;
-      flex-grow: 1; 
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      overflow: hidden; 
-      box-sizing: border-box;
-    }
-
-    .ram-module {
-      width: 100%;
-      height: 100%;
-      display: flex; 
-      flex-direction: column;
-      box-sizing: border-box;
     }
 
     /* --- CONTROLS --- */
-    .ram-controls {
+    .top-controls {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
-      padding: 0 5px;
-      flex-shrink: 0;
+      width: 100%;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #eef0f5;
     }
 
-    /* BUMPED: Mnemonics Label to 16px to match button */
-    .ram-controls label {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 16px; /* BUMPED FROM 14px */
-      color: #5a5475;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+    .checkbox-group {
       display: flex;
       align-items: center;
-      gap: 10px; /* Slightly wider gap for the bigger checkbox */
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      color: #5a5475;
+      font-size: 14px;
       cursor: pointer;
     }
 
-    /* Scaled up the physical checkbox square so it doesn't look tiny next to 16px text */
-    .ram-controls input[type="checkbox"] {
-      transform: scale(1.2);
+    .checkbox-group input {
+      margin-right: 8px;
+      width: 16px;
+      height: 16px;
       cursor: pointer;
-      margin: 0;
-      accent-color: #5a5475;
     }
 
-    /* BUMPED: Standardized Button Style (Red Theme) */
-    .clear-btn {
+    /* FIX: Mode selector buttons for BIN / HEX / MNEM */
+    .mode-btns {
+      display: flex;
+      gap: 4px;
+    }
+
+    .mode-btn {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border: 1px solid #b8b4c7;
+      border-radius: 3px;
+      cursor: pointer;
+      background: #fff;
+      color: #5a5475;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: #5a5475;
+      color: #fff;
+      border-color: #5a5475;
+    }
+
+    .btn {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #ffffff;
-      color: #c95c5a; 
-      border: 2px solid #c95c5a; 
-      padding: 6px 14px;
-      border-radius: 4px;
-      font-weight: bold;
+      color: #5a5475;
+      border: 2px solid #5a5475; 
+      padding: 4px 12px; 
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px; 
+      font-weight: bold;
+      text-transform: uppercase; 
       letter-spacing: 1px;
       transition: all 0.2s ease;
-      text-transform: uppercase;
     }
 
-    .clear-btn:hover { background-color: #fff0f0; }
+    .btn:hover {
+      background-color: #eef0f5;
+      color: #333333;
+    }
 
-    /* --- ENLARGED MEMORY GRID --- */
-    .ram-grid {
-      display: flex;
-      gap: 15px; 
+    /* --- MEMORY SLOTS GRID --- */
+    .memory-slots-wrapper {
       width: 100%;
-      flex-grow: 1; 
-      overflow: hidden; 
-    }
-
-    .ram-column {
       display: flex;
       flex-direction: column;
-      flex: 1; 
-      justify-content: space-between; 
-      min-width: 0; 
+      gap: 3px;
+      flex-grow: 1; 
+      overflow-y: auto; 
+      padding-right: 5px;
     }
 
-    .ram-cell {
+    /* Scrollbar */
+    .memory-slots-wrapper::-webkit-scrollbar { width: 8px; }
+    .memory-slots-wrapper::-webkit-scrollbar-track { background: #f0f0f5; border-radius: 4px; }
+    .memory-slots-wrapper::-webkit-scrollbar-thumb { background: #b8b4c7; border-radius: 4px; }
+
+    .memory-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 32px; 
+      background-color: #f8f8fc;
+      border: 1px solid #e2e2ec;
+      padding: 4px 8px;
+      flex-grow: 1; 
     }
 
-    /* BUMPED: Memory Address Labels */
-    .ram-cell label {
+    .memory-address {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 15px; 
       font-weight: bold;
       color: #5a5475;
-      width: 20px; 
+      width: 30px;
       text-align: right;
-      flex-shrink: 0;
+      margin-right: 10px;
+      font-size: 14px;
     }
 
-    /* BUMPED: Data Inputs */
-    .ram-input {
+    .memory-input {
+      flex-grow: 1;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 15px; 
-      color: #3b7c97; /* Standardized Data Teal */
-      border: 1px solid #b8b4c7;
-      border-radius: 4px;
-      padding: 4px 6px;
-      height: 28px; 
-      flex-grow: 1; 
-      min-width: 0; 
-      margin-left: 8px; 
-      text-align: center;
-      background-color: #f8f8fc;
       font-weight: bold;
-      letter-spacing: 2px;
+      font-size: 14px;
+      color: #3b7c97;
+      border: 1px solid #b8b4c7;
+      padding: 4px 8px;
       outline: none;
-      transition: border-color 0.2s, background-color 0.2s;
-      box-sizing: border-box;
+      transition: border-color 0.2s;
+      width: 100%;
     }
-    
-    .ram-input:focus { border-color: #3b7c97; background-color: #ffffff; }
 
+    .memory-input:focus {
+      border-color: #5a5475;
+      background-color: #ffffff;
+    }
   </style>
 </head>
 <body>
 
-  <div class="app-container">
+  <div class="ram-container">
     <h2 class="main-title">Main Memory (RAM)</h2>
-    
-    <div class="memory-block" id="memory-block">
-      <div class="ram-module" id="ram-module">
-        <div class="ram-controls">
-          <label><input type="checkbox" id="mnemonics-cb"> Mnemonics</label>
-          <button class="clear-btn" id="clear-btn">Clear</button>
-        </div>
-        <div class="ram-grid" id="ram-grid"></div>
+
+    <div class="top-controls">
+      <!-- FIX: Three display modes — MNEM, BIN, HEX -->
+      <div class="mode-btns">
+        <button class="mode-btn active" id="btn-mnem" onclick="setMode('mnem')">MNEM</button>
+        <button class="mode-btn" id="btn-hex" onclick="setMode('hex')">HEX</button>
+        <button class="mode-btn" id="btn-bin" onclick="setMode('bin')">BIN</button>
       </div>
+      <button class="btn" id="btn-clear">Clear</button>
     </div>
-    
+
+    <div class="memory-slots-wrapper" id="memory-wrapper">
+      </div>
+
   </div>
 
   <script>
-    const ramGrid = document.getElementById('ram-grid');
-    
-    // Generate the two columns
-    const column1 = document.createElement('div');
-    column1.className = 'ram-column';
-    const column2 = document.createElement('div');
-    column2.className = 'ram-column';
+    const socket = io();
 
-    // Loop to create 32 inputs
-    for (let i = 0; i < 32; i++) {
-      const cell = document.createElement('div');
-      cell.className = 'ram-cell';
-      
-      cell.innerHTML = `
-        <label>${i}</label>
-        <input type="text" value="00000000" maxlength="8" class="ram-input">
-      `;
-      
-      if (i < 16) {
-        column1.appendChild(cell);
-      } else {
-        column2.appendChild(cell);
+    const memoryWrapper = document.getElementById('memory-wrapper');
+    const btnClear = document.getElementById('btn-clear');
+
+    // FIX: Three cached states — bin, hex, mnem
+    let cachedMemoryBin   = Array(16).fill("00000000");
+    let cachedMemoryMnem  = Array(16).fill("NOP");
+    let cachedMemoryHex   = Array(16).fill("00");
+    let displayMode = 'mnem'; // 'mnem', 'hex', 'bin'
+
+    // FIX: Track which cell is being edited to avoid overwriting user input
+    let editingAddress = -1;
+
+    function setMode(mode) {
+      displayMode = mode;
+      ['mnem','hex','bin'].forEach(m => {
+        document.getElementById('btn-' + m).classList.toggle('active', m === mode);
+      });
+      refreshMemoryDisplay();
+    }
+
+    // 1. Build the 16 slots dynamically
+    function buildMemorySlots() {
+      for (let i = 0; i < 16; i++) {
+        const row = document.createElement('div');
+        row.className = 'memory-row';
+
+        const label = document.createElement('div');
+        label.className = 'memory-address';
+        label.textContent = i.toString(16).toUpperCase();
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'memory-input';
+        input.id = `mem-input-${i}`;
+        input.value = "NOP";
+
+        // FIX: Track focus so we don't overwrite during typing
+        input.addEventListener('focus', () => { editingAddress = i; });
+        input.addEventListener('blur',  (e) => {
+          editingAddress = -1;
+          // Send immediately on blur
+          socket.emit('update_memory_slot', { address: i, value: e.target.value });
+        });
+
+        // FIX: Also send on Enter key press for faster direct-writing workflow
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            socket.emit('update_memory_slot', { address: i, value: e.target.value });
+            // Move focus to next slot
+            const nextInput = document.getElementById(`mem-input-${(i + 1) % 16}`);
+            if (nextInput) nextInput.focus();
+          }
+        });
+
+        input.addEventListener('change', (e) => {
+          socket.emit('update_memory_slot', { address: i, value: e.target.value });
+        });
+
+        row.appendChild(label);
+        row.appendChild(input);
+        memoryWrapper.appendChild(row);
       }
     }
-    
-    ramGrid.appendChild(column1);
-    ramGrid.appendChild(column2);
 
-    // --- CLEAR BUTTON LOGIC ---
-    const clearBtn = document.getElementById('clear-btn');
-    clearBtn.addEventListener('click', function() {
-      const allInputs = document.querySelectorAll('.ram-input');
-      const mnemonicsCb = document.getElementById('mnemonics-cb');
-      
-      allInputs.forEach(input => {
-        input.value = mnemonicsCb.checked ? '' : '00000000';
-      });
-    });
-
-    // --- MNEMONICS CHECKBOX LOGIC ---
-    const mnemonicsCb = document.getElementById('mnemonics-cb');
-    mnemonicsCb.addEventListener('change', function() {
-      const allInputs = document.querySelectorAll('.ram-input');
-      
-      if (this.checked) {
-        allInputs.forEach(input => input.value = '');
-      } else {
-        allInputs.forEach(input => input.value = '00000000');
+    // 2. Refresh visuals based on display mode
+    function refreshMemoryDisplay() {
+      for (let i = 0; i < 16; i++) {
+        if (editingAddress === i) continue; // Don't touch the cell being edited
+        const input = document.getElementById(`mem-input-${i}`);
+        if (displayMode === 'mnem') input.value = cachedMemoryMnem[i];
+        else if (displayMode === 'hex') input.value = cachedMemoryHex[i];
+        else input.value = cachedMemoryBin[i];
       }
+    }
+
+    // FIX: Flash colours — green for normal change, amber for zero-result write
+    function flashCell(i, isZero) {
+      const input = document.getElementById(`mem-input-${i}`);
+      if (!input) return;
+      input.style.background = isZero ? '#fff3e0' : '#e0ffe0';
+      setTimeout(() => { input.style.background = ''; }, 400);
+    }
+
+    // --- SOCKET LISTENERS ---
+
+    socket.emit('request_memory_sync');
+
+    // FIX: memory_sync now includes hex field
+    socket.on('memory_sync', (state) => {
+      const oldBin = [...cachedMemoryBin];
+      cachedMemoryBin  = state.memory_bin  || cachedMemoryBin;
+      cachedMemoryMnem = state.memory_mnem || cachedMemoryMnem;
+      cachedMemoryHex  = state.memory_hex  || cachedMemoryHex;
+      // Flash cells that changed — amber if value is zero (all bits off)
+      for (let i = 0; i < 16; i++) {
+        if (cachedMemoryBin[i] !== oldBin[i]) {
+          flashCell(i, cachedMemoryBin[i] === '00000000');
+        }
+      }
+      refreshMemoryDisplay();
     });
 
-  </script>
+    btnClear.addEventListener('click', () => {
+      socket.emit('clear_memory');
+    });
 
+    buildMemorySlots();
+  </script>
 </body>
 </html>

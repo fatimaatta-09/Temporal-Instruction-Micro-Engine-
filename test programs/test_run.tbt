@@ -1,0 +1,15 @@
+MVI 5           
+STA E           
+LDA D           
+ADD D           
+ADD D          
+ADD D           
+LDA E          
+DEC             
+STA E           
+JNZ 3          
+LDA D           
+OUT 1          
+HLT            
+HEX 07         
+HEX 05         
